@@ -25,6 +25,10 @@ const LOOT_TABLE = [
   { slot: 'relic', name: 'Infinity Stone', maxHp: 50, lifesteal: 15, rarity: 'legendary', icon: '💎' }
 ];
 
+const SAVE_KEY = 'pixelDungeonSave';
+const SAVED_HERO_FIELDS = ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp',
+  'baseAtk', 'baseDef', 'baseSpd', 'lifesteal', 'potions', 'equipment'];
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('gameCanvas');
@@ -95,7 +99,12 @@ class Game {
 
     this.initUI();
     this.initControls();
-    this.startFloor(1);
+    const saved = this.loadGame();
+    this.startFloor(saved ? saved.floor : 1);
+    this.updateStatsUI();
+    this.updateBars();
+    setInterval(() => this.saveGame(), 3000);
+    window.addEventListener('beforeunload', () => this.saveGame());
     this.lastTime = performance.now();
     requestAnimationFrame((t) => this.loop(t));
   }
@@ -193,6 +202,33 @@ class Game {
     this.speedIndex = (this.speedIndex + 1) % this.gameSpeedOptions.length;
     this.speedMultiplier = this.gameSpeedOptions[this.speedIndex];
     this.speedBtn.textContent = `${this.speedMultiplier}x`;
+  }
+
+  // Save/load progress (floor, gold, hero level, stats, gear) in localStorage.
+  // Position within a floor isn't kept; a loaded game starts the saved floor fresh.
+  saveGame() {
+    const h = this.hero;
+    const hero = {};
+    for (const k of SAVED_HERO_FIELDS) hero[k] = h[k];
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, gold: this.gold, hero }));
+    } catch (e) { /* storage full or blocked: skip */ }
+  }
+
+  loadGame() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
+      this.gold = saved.gold || 0;
+      for (const k of SAVED_HERO_FIELDS) {
+        if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
+      }
+      if (this.hero.hp <= 0) this.hero.hp = this.hero.maxHp;
+      this.log(`Save loaded: Floor ${saved.floor}, Level ${this.hero.level}.`, 'system');
+      return saved;
+    } catch (e) {
+      return null;
+    }
   }
 
   startFloor(floorNum) {
