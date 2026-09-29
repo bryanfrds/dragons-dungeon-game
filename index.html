@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pixel Dungeon Crawler - Auto AI & Manual RPG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-dark">
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="header">
+      <div class="logo-group">
+        <span class="pixel-icon">⚔️</span>
+        <div>
+          <h1 class="title">PIXEL DUNGEON</h1>
+          <p class="subtitle">Auto-Play Bug Slayer RPG</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div class="stat-pill floor-pill">
+          <span class="label">FLOOR</span>
+          <span id="floorDisplay" class="value">1</span>
+        </div>
+        <div class="stat-pill gold-pill">
+          <span class="label">🪙 GOLD</span>
+          <span id="goldDisplay" class="value">0</span>
+        </div>
+        <div class="mode-toggle-group">
+          <button id="modeToggleBtn" class="btn btn-mode auto">
+            <span class="indicator"></span>
+            <span id="modeText">AI AUTO: ON</span>
+          </button>
+          <button id="speedBtn" class="btn btn-speed">1x</button>
+          <button id="soundToggleBtn" class="btn btn-icon" title="Toggle Sound">🔊</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="game-layout">
+      <!-- Left: Character & Stats Panel -->
+      <aside class="panel hero-panel">
+        <div class="panel-header">
+          <h2>HERO STATS</h2>
+          <span id="heroLevelBadge" class="level-badge">LVL 1</span>
+        </div>
+
+        <div class="hero-avatar-card">
+          <div class="avatar-frame">
+            <canvas id="avatarCanvas" width="64" height="64"></canvas>
+          </div>
+          <div class="hero-name-group">
+            <div id="heroClassTitle" class="hero-class">Pixel Knight</div>
+            <div class="bar-container hp-bar-bg">
+              <div id="hpBar" class="bar-fill hp-fill" style="width: 100%"></div>
+              <span id="hpText" class="bar-text">100 / 100 HP</span>
+            </div>
+            <div class="bar-container mp-bar-bg">
+              <div id="mpBar" class="bar-fill mp-fill" style="width: 100%"></div>
+              <span id="mpText" class="bar-text">50 / 50 MP</span>
+            </div>
+            <div class="bar-container xp-bar-bg">
+              <div id="xpBar" class="bar-fill xp-fill" style="width: 0%"></div>
+              <span id="xpText" class="bar-text">0 / 100 XP</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="attributes-grid">
+          <div class="attr-box">
+            <span class="attr-icon">🗡️</span>
+            <div class="attr-info">
+              <span class="attr-label">ATTACK</span>
+              <span id="statAtk" class="attr-val">12</span>
+            </div>
+          </div>
+          <div class="attr-box">
+            <span class="attr-icon">🛡️</span>
+            <div class="attr-info">
+              <span class="attr-label">DEFENSE</span>
+              <span id="statDef" class="attr-val">5</span>
+            </div>
+          </div>
+          <div class="attr-box">
+            <span class="attr-icon">⚡</span>
+            <div class="attr-info">
+              <span class="attr-label">SPEED</span>
+              <span id="statSpd" class="attr-val">4.0</span>
+            </div>
+          </div>
+          <div class="attr-box">
+            <span class="attr-icon">🩸</span>
+            <div class="attr-info">
+              <span class="attr-label">LIFESTEAL</span>
+              <span id="statLifesteal" class="attr-val">0%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Equipment Slots -->
+        <div class="equipment-section">
+          <h3>EQUIPPED GEAR</h3>
+          <div class="equipment-slots">
+            <div class="eq-slot" id="slotWeapon" title="Weapon">
+              <span class="eq-icon">⚔️</span>
+              <div class="eq-meta">
+                <span class="eq-name" id="eqWeaponName">Rusty Blade</span>
+                <span class="eq-stat" id="eqWeaponStat">+4 Atk</span>
+              </div>
+            </div>
+            <div class="eq-slot" id="slotArmor" title="Armor">
+              <span class="eq-icon">🥋</span>
+              <div class="eq-meta">
+                <span class="eq-name" id="eqArmorName">Cloth Tunic</span>
+                <span class="eq-stat" id="eqArmorStat">+2 Def</span>
+              </div>
+            </div>
+            <div class="eq-slot" id="slotRelic" title="Relic">
+              <span class="eq-icon">💍</span>
+              <div class="eq-meta">
+                <span class="eq-name" id="eqRelicName">Wooden Ring</span>
+                <span class="eq-stat" id="eqRelicStat">+10 Max HP</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Abilities Bar -->
+        <div class="skills-section">
+          <h3>ACTIVE SKILLS (1-3)</h3>
+          <div class="skills-grid">
+            <button id="skill1Btn" class="skill-btn" data-skill="slash">
+              <span class="skill-key">1</span>
+              <span class="skill-icon">🌪️</span>
+              <span class="skill-name">Whirlwind</span>
+              <div class="skill-cd-overlay" id="skill1Cd"></div>
+            </button>
+            <button id="skill2Btn" class="skill-btn" data-skill="shield">
+              <span class="skill-key">2</span>
+              <span class="skill-icon">🛡️</span>
+              <span class="skill-name">Iron Wall</span>
+              <div class="skill-cd-overlay" id="skill2Cd"></div>
+            </button>
+            <button id="skill3Btn" class="skill-btn" data-skill="potion">
+              <span class="skill-key">3</span>
+              <span class="skill-icon">🧪</span>
+              <span class="skill-name">Heal (<span id="potionCount">2</span>)</span>
+              <div class="skill-cd-overlay" id="skill3Cd"></div>
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center: Main Canvas Viewport -->
+      <section class="canvas-wrapper">
+        <div class="viewport-overlay-top">
+          <div class="dungeon-info">
+            <span class="zone-name" id="zoneName">The Debug Catacombs</span>
+            <span class="monsters-remaining" id="monstersRemaining">Bugs: 0/0</span>
+          </div>
+          <div class="ai-status-badge" id="aiStatusBadge">
+            <span class="ai-dot"></span>
+            <span id="aiActionText">AI: Hunting Bugs...</span>
+          </div>
+        </div>
+
+        <div class="canvas-container">
+          <canvas id="gameCanvas" width="800" height="520"></canvas>
+
+          <!-- Interactive overlay for floating messages / pause / game over -->
+          <div id="gameOverlay" class="game-overlay hidden">
+            <div class="overlay-content">
+              <h2 id="overlayTitle">FLOOR CLEARED!</h2>
+              <p id="overlayMessage">Descending deeper into the memory stack...</p>
+              <button id="overlayBtn" class="btn btn-primary">NEXT FLOOR</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="controls-hint">
+          <span>⌨️ <b>Controls:</b> [WASD / Arrows] Move &bull; [Space] Attack &bull; [1, 2, 3] Skills &bull; [Tab] Toggle Auto-Play AI</span>
+        </div>
+      </section>
+
+      <!-- Right: Activity Log & Bestiary/Loot -->
+      <aside class="panel activity-panel">
+        <div class="panel-header">
+          <h2>EVENT LOG</h2>
+          <button id="clearLogBtn" class="btn-text">Clear</button>
+        </div>
+        <div class="combat-log" id="combatLog">
+          <div class="log-entry system">[SYSTEM] Welcome to Pixel Dungeon! Auto-AI is engaged.</div>
+        </div>
+
+        <div class="panel-header mt-2">
+          <h2>DUNGEON LOOT</h2>
+          <span class="loot-count" id="lootCount">0 items</span>
+        </div>
+        <div class="loot-feed" id="lootFeed">
+          <div class="empty-loot">Loot drops will appear here...</div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="audio.js"></script>
+  <script src="sprites.js"></script>
+  <script src="dungeon.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
