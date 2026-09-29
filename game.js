@@ -29,6 +29,12 @@ const SAVE_KEY = 'pixelDungeonSave';
 const SAVED_HERO_FIELDS = ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp',
   'baseAtk', 'baseDef', 'baseSpd', 'lifesteal', 'potions', 'equipment'];
 
+// ?portrait turns the map on its side (16 wide, 25 tall) for tall displays such
+// as a herdr side pane. Same floor area, so difficulty and pacing don't change.
+const PORTRAIT = new URLSearchParams(location.search).has('portrait');
+const MAP_COLS = PORTRAIT ? 16 : 25;
+const MAP_ROWS = PORTRAIT ? 25 : 16;
+
 class Game {
   constructor() {
     this.canvas = document.getElementById('gameCanvas');
@@ -36,7 +42,10 @@ class Game {
     this.avatarCanvas = document.getElementById('avatarCanvas');
     this.avatarCtx = this.avatarCanvas.getContext('2d');
 
-    this.dungeonGen = new window.DungeonGenerator(25, 16);
+    this.dungeonGen = new window.DungeonGenerator(MAP_COLS, MAP_ROWS);
+    // The canvas has to match the map, or tiles past the edge are simply cut off.
+    this.canvas.width = MAP_COLS * TILE_SIZE;
+    this.canvas.height = MAP_ROWS * TILE_SIZE + 8;
     this.sound = window.soundEngine;
     this.sprites = window.spriteRenderer;
 
