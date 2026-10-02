@@ -111,7 +111,47 @@ function nextShopBuy(state) {
   return upgrades.length ? upgrades[0].id : null;
 }
 
+/** A number from a save, or `fallback` if it isn't one; clamped, optionally whole. */
+function cleanNumber(value, min, max, fallback, whole = true) {
+  let n = Number(value);
+  if (value === null || value === '' || !Number.isFinite(n)) return fallback;
+  if (whole) n = Math.floor(n);
+  return Math.min(max, Math.max(min, n));
+}
+
+// Every hero number a save can hold, with the range it's allowed in. Anything
+// outside is clamped and anything that isn't a number keeps the default, so a
+// hand-edited save can't break levelling, the shop or autoplay.
+const HERO_LIMITS = {
+  level: [1, 1000], xp: [0, 1e9], maxXp: [1, 1e9], hp: [0, 1e6], maxHp: [1, 1e6],
+  mp: [0, 1e6], maxMp: [1, 1e6], baseAtk: [0, 1e6], baseDef: [0, 1e6],
+  baseSpd: [0.5, 20, false], lifesteal: [0, 100], potions: [0, 5],
+};
+
+/** Copy the saved hero numbers onto `hero`, each cleaned against HERO_LIMITS. */
+function loadHeroNumbers(hero, saved) {
+  for (const [k, [min, max, whole = true]] of Object.entries(HERO_LIMITS)) {
+    hero[k] = cleanNumber(saved[k], min, max, hero[k], whole);
+  }
+  hero.xp = Math.min(hero.xp, hero.maxXp - 1);   // never a pending level-up loop
+  return hero;
+}
+
+/** A saved piece of gear, kept only if it's an object whose numbers are sane. */
+function cleanGear(item, slot) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const out = { slot, name: String(item.name || 'Unknown').slice(0, 40),
+                rarity: ['common', 'rare', 'epic', 'legendary'].includes(item.rarity) ? item.rarity : 'common' };
+  if (item.icon) out.icon = String(item.icon).slice(0, 4);
+  for (const k of ['atk', 'def', 'maxHp', 'lifesteal']) {
+    if (item[k] !== undefined) out[k] = cleanNumber(item[k], 0, 1e5, 0);
+  }
+  if (item.spd !== undefined) out.spd = cleanNumber(item.spd, 0, 5, 0, false);
+  return out;
+}
+
 if (typeof window !== 'undefined') {
   Object.assign(window, { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds, spawnableTypes,
-                         SHOP_ITEMS, MAX_POTIONS, shopPrice, buyFromShop, nextShopBuy });
+                         SHOP_ITEMS, MAX_POTIONS, shopPrice, buyFromShop, nextShopBuy,
+                         cleanNumber, HERO_LIMITS, loadHeroNumbers, cleanGear });
 }
