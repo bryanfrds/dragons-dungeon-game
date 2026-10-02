@@ -509,6 +509,8 @@ class Game {
     this.sound.playPotion();
     this.addFloatingText(`+${healAmt} HP`, this.hero.x + 16, this.hero.y, '#34d399');
     this.log(`Used Health Potion! Restored ${healAmt} HP.`, 'heal');
+    // Drinking one while the shop is open frees a bag slot.
+    if (!this.overlay.classList.contains('hidden') && this.hero.hp > 0) this.renderShop();
     this.updateBars();
     this.updateStatsUI();
   }
@@ -732,7 +734,9 @@ class Game {
         this.aiActionText.textContent = 'AI: Descending to Next Floor...';
         const dst = Math.hypot(this.dungeon.stairsPos.x - this.hero.gx, this.dungeon.stairsPos.y - this.hero.gy);
         if (dst === 0) {
-          this.triggerNextFloorModal();
+          // Only once: the AI ticks every 0.15s while standing here, and each
+          // call rebuilt the shop (eating clicks) and queued another descent.
+          if (this.overlay.classList.contains('hidden')) this.triggerNextFloorModal();
         } else {
           const path = this.dungeonGen.findPath({ x: this.hero.gx, y: this.hero.gy }, this.dungeon.stairsPos);
           if (path.length > 0) this.moveHeroTo(path[0].x, path[0].y);
