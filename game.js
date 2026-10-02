@@ -699,7 +699,13 @@ class Game {
     if (this.hero.moveCooldown > 0) return;
     // Bugs block the way; walking straight through them looked broken.
     if (this.dungeonGen.isWalkable(gx, gy) && !this.monsterAt(gx, gy)) {
-      this.hero.moveCooldown = stepSeconds(this.totalSpeed);
+      // += keeps the part of a frame that overshot the last step (at most one
+      // frame, since the cooldown only counts down while above 0), so the real
+      // rate matches the speed stat instead of falling a little short.
+      this.hero.moveCooldown += stepSeconds(this.totalSpeed);
+      // The AI decides every 0.15s; without this its steps landed on every
+      // second decision whatever the speed, so Hermes did nothing in autoplay.
+      if (this.autoPlay) this.aiCooldown = this.hero.moveCooldown;
       this.hero.facing = gx >= this.hero.gx ? 1 : -1;
       this.hero.gx = gx;
       this.hero.gy = gy;
