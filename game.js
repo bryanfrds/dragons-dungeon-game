@@ -875,8 +875,10 @@ class Game {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     // 1. Draw Dungeon Floor & Walls
-    for (let r = 0; r < this.dungeon.rows; r++) {
-      for (let c = 0; c < this.dungeon.cols; c++) {
+    // The floor object has no rows/cols, so looping on those drew nothing at
+    // all: every floor and wall tile was missing and the map was solid black.
+    for (let r = 0; r < this.dungeon.grid.length; r++) {
+      for (let c = 0; c < this.dungeon.grid[r].length; c++) {
         const tile = this.dungeon.grid[r][c];
         const px = c * TILE_SIZE;
         const py = r * TILE_SIZE;
