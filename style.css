@@ -105,6 +105,10 @@ body {
   font-weight: 700;
 }
 
+.best-pill .value {
+  color: #c084fc;
+}
+
 .gold-pill .value {
   color: var(--accent-gold);
   font-weight: 700;

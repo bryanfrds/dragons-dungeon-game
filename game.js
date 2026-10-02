@@ -59,6 +59,7 @@ class Game {
 
     // Game state
     this.floor = 1;
+    this.bestFloor = 1;    // deepest floor ever reached; kept across deaths
     this.gold = 0;
     this.autoPlay = true;
     this.speedMultiplier = 1;
@@ -232,7 +233,7 @@ class Game {
     const hero = {};
     for (const k of SAVED_HERO_FIELDS) hero[k] = h[k];
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, gold: this.gold, hero }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, bestFloor: this.bestFloor, gold: this.gold, hero }));
     } catch (e) { /* storage full or blocked: skip */ }
   }
 
@@ -241,6 +242,7 @@ class Game {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
       if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
       this.gold = saved.gold || 0;
+      this.bestFloor = Math.max(saved.floor, Number(saved.bestFloor) || 1);
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }
@@ -260,6 +262,12 @@ class Game {
   startFloor(floorNum) {
     this.floor = floorNum;
     this.floorDisplay.textContent = this.floor;
+    if (this.floor > this.bestFloor) {
+      this.bestFloor = this.floor;
+      if (this.floor > 1) this.log(`New record: Floor ${this.floor}!`, 'level');
+    }
+    const best = document.getElementById('bestDisplay');
+    if (best) best.textContent = this.bestFloor;
     this.isFloorCleared = false;
     this.dungeon = this.dungeonGen.generate(this.floor);
     this.fade = 0.45;
