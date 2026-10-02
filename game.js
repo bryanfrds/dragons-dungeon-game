@@ -2,9 +2,15 @@
 
 const MONSTER_TYPES = [
   // spd: tiles per second when chasing the hero. Ghosts are quick, slimes ooze.
-  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2 },
-  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2 },
-  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6 },
+  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2, minFloor: 1 },
+  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2, minFloor: 3 },
+  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6, minFloor: 5 },
+  // From floor 4: fragile but fast, and it strikes twice as often.
+  { type: 'race', name: 'Race Condition', baseHp: 22, baseAtk: 9, xp: 45, gold: 18, color: '#facc15', spd: 3.2,
+    attackRate: 0.5, minFloor: 4 },
+  // From floor 7: slow, and it heals itself unless you finish it quickly.
+  { type: 'loop', name: 'Infinite Loop', baseHp: 55, baseAtk: 10, xp: 70, gold: 26, color: '#a855f7', spd: 1.3,
+    regen: 0.06, minFloor: 7 },
   { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24', spd: 1.0 }
 ];
 
@@ -294,8 +300,8 @@ class Game {
       const room = this.dungeon.rooms[i];
       const count = Math.floor(Math.random() * 2) + 1;
       for (let c = 0; c < count; c++) {
-        const typeIdx = Math.min(Math.floor(Math.random() * 3), Math.floor((this.floor - 1) / 2));
-        const mType = MONSTER_TYPES[typeIdx].type;
+        const choices = spawnableTypes(MONSTER_TYPES, this.floor);
+        const mType = choices[Math.floor(Math.random() * choices.length)].type;
         const mx = room.x + Math.floor(Math.random() * (room.w - 2)) + 1;
         const my = room.y + Math.floor(Math.random() * (room.h - 2)) + 1;
         // One bug per tile, and never on a chest or the stairs.
@@ -331,6 +337,8 @@ class Game {
       facing: -1,
       attackCooldown: 0,
       spd: template.spd,
+      attackRate: template.attackRate || 1.0,   // seconds between hits
+      regen: template.regen || 0,               // share of max HP healed per second
       moveCooldown: Math.random(),   // so a room of bugs doesn't move in lockstep
       animTimer: Math.random() * 10
     });
@@ -844,6 +852,7 @@ class Game {
     this.monsters.forEach(m => {
       if (this.hero.hp <= 0) return;   // the hero fell earlier this frame
       m.animTimer += dt * 4;
+      if (m.regen) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * m.regen * dt);
       m.attackCooldown -= dt;
 
       // Distance to hero
@@ -854,7 +863,7 @@ class Game {
       m.y += (m.gy * TILE_SIZE - m.y) * Math.min(1, 10 * dt);
       if (dist <= 1.2 && m.attackCooldown <= 0) {
         // Monster attacks hero
-        m.attackCooldown = 1.0;
+        m.attackCooldown = m.attackRate;
         const monsterDmg = monsterHitDamage(m.atk, this.totalDefense, this.hero.shieldActiveTimer > 0);
         this.hero.hp -= monsterDmg;
         this.hero.hurtTimer = 0.18;
