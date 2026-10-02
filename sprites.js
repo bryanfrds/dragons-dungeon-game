@@ -156,6 +156,50 @@ class SpriteRenderer {
         "................",
         "................"
       ];
+    } else if (type === 'race') {
+      // Race Condition: two sparks racing each other; they swap places each frame.
+      colors = { 'Y': '#facc15', 'O': '#f97316', 'W': '#fffbeb', 'E': '#7c2d12' };
+      const a = [
+        "..YY............",
+        ".YWWY...........",
+        "YWEEWY.....OO...",
+        "YWWWWY....OWWO..",
+        ".YYYY....OWEEWO.",
+        "..YY.....OWWWWO.",
+        "...Y......OOOO..",
+        "....Y......OO...",
+        ".....Y....O.....",
+        "......Y..O......",
+        ".......YO.......",
+        "......OY........",
+        ".....O..Y.......",
+        "....O....Y......",
+        "................",
+        "................"
+      ];
+      // Mirror the picture left-to-right on the second frame so they trade sides.
+      matrix = frame === 0 ? a : a.map(row => row.split('').reverse().join(''));
+    } else if (type === 'loop') {
+      // Infinite Loop: a purple ring chasing its own tail.
+      colors = { 'P': frame === 0 ? '#a855f7' : '#c084fc', 'D': '#6b21a8', 'E': '#ffffff', 'H': '#f0abfc' };
+      matrix = [
+        "................",
+        ".....PPPPPP.....",
+        "...PPDDDDDDPP...",
+        "..PDD......DDP..",
+        ".PD..........DP.",
+        ".PD..........DP.",
+        "PD............DP",
+        "PD............HH",
+        "PD...........HEH",
+        "PD...........HHH",
+        ".PD..........DP.",
+        ".PD..........DP.",
+        "..PDD......DDP..",
+        "...PPDDDDDDPP...",
+        ".....PPPPPP.....",
+        "................"
+      ];
     } else {
       // Boss: Merge Conflict Dragon/Demon
       colors = {
