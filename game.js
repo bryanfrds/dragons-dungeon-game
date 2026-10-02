@@ -625,7 +625,10 @@ class Game {
 
     // 2. Check if surrounded by >= 2 monsters -> trigger Whirlwind
     const adjacentCount = this.monsters.filter(m => Math.hypot(m.gx - this.hero.gx, m.gy - this.hero.gy) <= 1.5).length;
-    if (adjacentCount >= 2 && this.hero.skills.whirlwind.cd <= 0) {
+    // Only when there's MP for it: with the cooldown ready but under 15 MP,
+    // Whirlwind did nothing yet the AI still skipped its turn, so it stood there
+    // being hit until the MP came back.
+    if (adjacentCount >= 2 && this.hero.skills.whirlwind.cd <= 0 && this.hero.mp >= 15) {
       this.triggerWhirlwind();
       return;
     }
