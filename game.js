@@ -241,6 +241,9 @@ class Game {
       // A broken save with maxXp of 0 or less would make applyXp loop forever.
       if (!(this.hero.maxXp >= 1)) this.hero.maxXp = 60;
       if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
+      // The badge is static HTML that only level-ups updated, so a loaded
+      // level-8 hero still showed "LVL 1".
+      document.getElementById('heroLevelBadge').textContent = `LVL ${this.hero.level}`;
       this.log(`Save loaded: Floor ${saved.floor}, Level ${this.hero.level}.`, 'system');
       return saved;
     } catch (e) {
