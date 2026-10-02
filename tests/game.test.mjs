@@ -386,3 +386,20 @@ test('drinking a potion with the shop open frees the potion button', () => {
   game.usePotion();
   assert.equal(elements.shopRow.children.at(-4).disabled, false);
 });
+
+test('no save can freeze autoplay shopping: at most 50 buys a floor', () => {
+  const game = makeGame();
+  ctx.localStorage.setItem('pixelDungeonSave',
+    '{"floor":3,"gold":1e300,"hero":{"level":4,"potions":-1e308,"maxHp":"100","hp":"abc"}}');
+  assert.ok(game.loadGame());
+  assert.equal(game.gold, 1e9);                    // capped
+  assert.equal(game.hero.potions, 0);
+  assert.equal(game.hero.maxHp, 100);              // "100" became a number, so +20 adds
+  game.autoPlay = true;
+  const t = Date.now();
+  Game.prototype.triggerNextFloorModal.call(game);
+  assert.ok(Date.now() - t < 500, 'shopping returned quickly');
+  const buys = Object.values(game.shopBought).reduce((a, b) => a + b, 0);
+  assert.ok(buys <= 50, `${buys} buys`);
+  assert.equal(game.hero.potions, 3);
+});
