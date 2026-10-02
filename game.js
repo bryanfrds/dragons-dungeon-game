@@ -356,10 +356,7 @@ class Game {
 
     document.getElementById('eqRelicName').textContent = this.hero.equipment.relic?.name || 'Empty';
     // Every bonus the ring has. Boots of Hermes used to read "+10 HP" (it's speed).
-    const relic = this.hero.equipment.relic || {};
-    const bonuses = [relic.maxHp && `+${relic.maxHp} HP`, relic.lifesteal && `+${relic.lifesteal}% Lifesteal`,
-                     relic.spd && `+${relic.spd} Spd`].filter(Boolean);
-    document.getElementById('eqRelicStat').textContent = bonuses.join(', ') || 'No bonus';
+    document.getElementById('eqRelicStat').textContent = this.describeItem(this.hero.equipment.relic || {});
 
     document.getElementById('potionCount').textContent = this.hero.potions;
   }
@@ -392,11 +389,19 @@ class Game {
         <span class="loot-icon">${item.icon || '📦'}</span>
         <div style="flex:1">
           <b style="color:#fff">${item.name}</b>
-          <div style="font-size:9px; color:#38bdf8">${item.atk ? `+${item.atk} Atk` : item.def ? `+${item.def} Def` : `+${item.lifesteal || 10}% Boost`} (${item.rarity.toUpperCase()})</div>
+          <div style="font-size:9px; color:#38bdf8">${this.describeItem(item)} (${item.rarity.toUpperCase()})</div>
         </div>
       `;
       this.lootFeed.appendChild(card);
     });
+  }
+
+  /** "+14 Atk", "+12 Def", or a ring's bonuses, e.g. "+50 HP, +15% Lifesteal". */
+  describeItem(item) {
+    if (item.atk) return `+${item.atk} Atk`;
+    if (item.def) return `+${item.def} Def`;
+    return [item.maxHp && `+${item.maxHp} HP`, item.lifesteal && `+${item.lifesteal}% Lifesteal`,
+            item.spd && `+${item.spd} Spd`].filter(Boolean).join(', ') || 'No bonus';
   }
 
   // Abilities
