@@ -7,10 +7,16 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSearchParams };
+// A canvas that accepts any drawing call and does nothing, for the floor layer.
+const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+const elements = {};
+const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSearchParams,
+              document: { createElement: () => ({ getContext: () => noop }),
+                          getElementById: (id) => (elements[id] ||= {}) },
+              localStorage: { store: {}, getItem(k) { return this.store[k] ?? null; }, setItem(k, v) { this.store[k] = v; } } };
 vm.createContext(ctx);
 const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('game.js') +
+vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('tiles.js') + '\n' + src('game.js') +
   '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES; this.LOOT_TABLE = LOOT_TABLE;', ctx);
 const { Game, TILE, MONSTER_TYPES } = ctx;
 const { DungeonGenerator } = ctx.window;
@@ -22,7 +28,9 @@ function makeGame(W = 12, H = 12) {
     x === 0 || y === 0 || x === W - 1 || y === H - 1 ? TILE.WALL : TILE.FLOOR));
   Object.assign(game, {
     dungeonGen: gen,
-    dungeon: { grid: gen.grid, rows: H, cols: W, stairsPos: { x: W - 2, y: H - 2 }, chests: [] },
+    // Shaped like DungeonGenerator.generate()'s result: no rows/cols, which is
+    // what hid the black-map bug (render looped on fields that didn't exist).
+    dungeon: { grid: gen.grid, stairsPos: { x: W - 2, y: H - 2 }, chests: [] },
     hero: {
       x: 32, y: 32, targetX: 32, targetY: 32, gx: 1, gy: 1, facing: 1,
       level: 1, xp: 0, maxXp: 60, hp: 100, maxHp: 100, mp: 50, maxMp: 50,
@@ -204,4 +212,30 @@ test('walking keeps time exactly, without losing the part of a frame that oversh
   run(game, 10);
   const walked = game.hero.gx - 1;
   assert.ok(walked >= 45 && walked <= 46, `walked ${walked} tiles in 10s at speed 4.5`);
+});
+
+test('the swing pose shows during a swing and then drops', () => {
+  const game = makeGame();
+  game.autoPlay = false;
+  addBug(game, 'slime', 2, 1);
+  game.manualAttack();
+  assert.equal(game.hero.isAttacking, true);
+  run(game, 0.3);
+  assert.equal(game.hero.isAttacking, false);
+});
+
+test('a new floor builds a tile layer the size of the map', () => {
+  const game = makeGame();
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(1);
+  assert.equal(game.floorLayer.width, game.dungeon.grid[0].length * 32);
+  assert.equal(game.floorLayer.height, game.dungeon.grid.length * 32);
+});
+
+test('loading a save shows its level on the hero badge', () => {
+  const game = makeGame();
+  ctx.localStorage.setItem('pixelDungeonSave', JSON.stringify({ floor: 4, gold: 9, hero: { level: 8 } }));
+  elements.heroLevelBadge = { textContent: 'LVL 1' };
+  assert.ok(game.loadGame());
+  assert.equal(elements.heroLevelBadge.textContent, 'LVL 8');
 });
