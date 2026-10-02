@@ -810,7 +810,7 @@ class Game {
 
     // Cooldown timers
     if (this.hero.attackCooldown > 0) this.hero.attackCooldown -= dt;
-    // The swing pose lasts as long as the swing; it used to stay on forever.
+    // The swing pose shows for the first part of the swing; it used to stay on forever.
     if (this.hero.attackCooldown <= 0.2) this.hero.isAttacking = false;
     if (this.hero.moveCooldown > 0) this.hero.moveCooldown -= dt;
     if (this.hero.hurtTimer > 0) this.hero.hurtTimer -= dt;
