@@ -11,19 +11,18 @@ const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSe
 vm.createContext(ctx);
 const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('game.js') +
-  '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES;', ctx);
+  '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES; this.LOOT_TABLE = LOOT_TABLE;', ctx);
 const { Game, TILE, MONSTER_TYPES } = ctx;
 const { DungeonGenerator } = ctx.window;
 
-const SIZE = 12;
-function makeGame() {
+function makeGame(W = 12, H = 12) {
   const game = Object.create(Game.prototype);
-  const gen = new DungeonGenerator(SIZE, SIZE);
-  gen.grid = Array.from({ length: SIZE }, (_, y) => Array.from({ length: SIZE }, (_, x) =>
-    x === 0 || y === 0 || x === SIZE - 1 || y === SIZE - 1 ? TILE.WALL : TILE.FLOOR));
+  const gen = new DungeonGenerator(W, H);
+  gen.grid = Array.from({ length: H }, (_, y) => Array.from({ length: W }, (_, x) =>
+    x === 0 || y === 0 || x === W - 1 || y === H - 1 ? TILE.WALL : TILE.FLOOR));
   Object.assign(game, {
     dungeonGen: gen,
-    dungeon: { grid: gen.grid, rows: SIZE, cols: SIZE, stairsPos: { x: 10, y: 10 }, chests: [] },
+    dungeon: { grid: gen.grid, rows: H, cols: W, stairsPos: { x: W - 2, y: H - 2 }, chests: [] },
     hero: {
       x: 32, y: 32, targetX: 32, targetY: 32, gx: 1, gy: 1, facing: 1,
       level: 1, xp: 0, maxXp: 60, hp: 100, maxHp: 100, mp: 50, maxMp: 50,
@@ -36,9 +35,9 @@ function makeGame() {
     floor: 1, gold: 0, logs: 0,
     sound: new Proxy({}, { get: () => () => {} }),
     overlay: { classList: { contains: () => true, add() {}, remove() {} } },
-    aiActionText: {},
+    aiActionText: {}, floorDisplay: {}, zoneName: {},
   });
-  for (const m of ['updateBars', 'updateStatsUI', 'updateMonstersCount', 'rollLootDrop', 'triggerNextFloorModal'])
+  for (const m of ['updateBars', 'updateStatsUI', 'updateMonstersCount', 'addLootDrop', 'triggerNextFloorModal'])
     game[m] = () => {};
   game.log = () => { game.logs++; };
   return game;
@@ -116,11 +115,16 @@ test('while dead nothing happens: no hits, no potion, no skills', () => {
   game.hero.hp = 0;
   game.usePotion();
   game.triggerWhirlwind();
+  game.triggerShield();
   game.manualAttack();
   run(game, 2);
   assert.equal(game.hero.hp, 0);
   assert.equal(game.hero.potions, 2);
   assert.equal(game.logs, 0);
+  assert.equal(game.monsters[0].hp, 50, 'no attack landed');
+  assert.equal(game.hero.attackCooldown, 0, 'no attack was even swung');
+  assert.equal(game.hero.shieldActiveTimer, 0, 'no Iron Wall');
+  assert.equal(game.hero.mp, 50, 'no MP spent');
 });
 
 test('while dead the AI stops walking', () => {
@@ -146,4 +150,58 @@ test("max HP includes the ring's bonus", () => {
   assert.equal(game.maxHp, 110);
   game.hero.equipment.relic = { lifesteal: 12 };
   assert.equal(game.maxHp, 100);
+});
+
+test("two bugs chasing down one corridor never share a tile", () => {
+  const game = makeGame(12, 3);                 // a 10-tile corridor
+  game.autoPlay = false;
+  const a = addBug(game, 'ghost', 4, 1);
+  const b = addBug(game, 'ghost', 5, 1);
+  for (let i = 0; i < 180; i++) {
+    game.update(1 / 60);
+    assert.ok(!(a.gx === b.gx && a.gy === b.gy), `stacked at ${a.gx},${a.gy}`);
+  }
+  assert.deepEqual([a.gx, b.gx], [2, 3]);       // queued up behind each other
+});
+
+test('a floor spawns at most one bug per tile, never on a chest or the stairs', () => {
+  for (let floor = 1; floor <= 60; floor++) {
+    const game = makeGame();
+    game.dungeonGen = new DungeonGenerator(25, 16);
+    game.startFloor(floor);
+    const tiles = game.monsters.map(m => `${m.gx},${m.gy}`);
+    assert.equal(new Set(tiles).size, tiles.length, `floor ${floor}: two bugs on one tile`);
+    for (const m of game.monsters) {
+      if (m.type === 'boss') continue;            // the boss stands on the stairs on purpose
+      assert.equal(game.dungeon.grid[m.gy][m.gx], TILE.FLOOR, `floor ${floor}: bug on ${game.dungeon.grid[m.gy][m.gx]}`);
+    }
+  }
+});
+
+test('swapping to a better ring with less HP lowers HP to the new cap', () => {
+  const game = makeGame();
+  game.hero.equipment.relic = { slot: 'relic', name: 'Wooden Ring', maxHp: 10, rarity: 'common' };
+  game.hero.hp = 110;
+  // Pick the Vampiric Fang (lifesteal, no HP) out of the loot table.
+  // The sandbox has its own Math, so its random is swapped from inside.
+  const realRandom = vm.runInContext('Math.random', ctx);
+  const fang = ctx.LOOT_TABLE.findIndex(i => i.name === 'Vampiric Fang');
+  ctx.pick = () => (fang + 0.5) / ctx.LOOT_TABLE.length;
+  vm.runInContext('Math.random = pick', ctx);
+  try { game.rollLootDrop(false); } finally { ctx.pick = realRandom; vm.runInContext('Math.random = pick', ctx); }
+  assert.equal(game.hero.equipment.relic.name, 'Vampiric Fang');
+  assert.equal(game.maxHp, 100);
+  assert.equal(game.hero.hp, 100);
+});
+
+test('walking keeps time exactly, without losing the part of a frame that overshoots', () => {
+  // At speed 4.5 a step is 0.222s, which isn't a whole number of 60fps frames,
+  // so dropping each overshoot would lose a tile every 5 seconds or so.
+  const game = makeGame(52, 3);
+  game.autoPlay = false;
+  game.hero.equipment.relic = { spd: 1 };
+  game.keys.KeyD = true;
+  run(game, 10);
+  const walked = game.hero.gx - 1;
+  assert.ok(walked >= 45 && walked <= 46, `walked ${walked} tiles in 10s at speed 4.5`);
 });
