@@ -105,6 +105,10 @@ body {
   font-weight: 700;
 }
 
+.best-pill .value {
+  color: #c084fc;
+}
+
 .gold-pill .value {
   color: var(--accent-gold);
   font-weight: 700;
@@ -591,6 +595,31 @@ body {
   gap: 16px;
   align-items: center;
 }
+
+/* The shop on the floor-cleared screen: one button per item. */
+.shop-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 8px;
+}
+.shop-row.hidden { display: none; }
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #0f131b;
+  border: 1px solid #2a3447;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.shop-item:hover:not(:disabled) { border-color: var(--accent-gold); }
+.shop-item:disabled { opacity: 0.4; cursor: not-allowed; }
+.shop-item .price { margin-left: auto; color: var(--accent-gold); font-weight: 700; }
+.shop-item small { display: block; color: #94a3b8; font-size: 10px; }
 
 .overlay-content h2 {
   font-family: var(--pixel-font);

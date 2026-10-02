@@ -2,9 +2,15 @@
 
 const MONSTER_TYPES = [
   // spd: tiles per second when chasing the hero. Ghosts are quick, slimes ooze.
-  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2 },
-  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2 },
-  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6 },
+  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2, minFloor: 1 },
+  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2, minFloor: 3 },
+  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6, minFloor: 5 },
+  // From floor 4: fragile but fast, and it strikes twice as often.
+  { type: 'race', name: 'Race Condition', baseHp: 22, baseAtk: 9, xp: 45, gold: 18, color: '#facc15', spd: 3.2,
+    attackRate: 0.5, minFloor: 4 },
+  // From floor 7: slow, and it heals itself unless you finish it quickly.
+  { type: 'loop', name: 'Infinite Loop', baseHp: 55, baseAtk: 10, xp: 70, gold: 26, color: '#a855f7', spd: 1.3,
+    regen: 0.06, minFloor: 7 },
   { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24', spd: 1.0 }
 ];
 
@@ -53,6 +59,8 @@ class Game {
 
     // Game state
     this.floor = 1;
+    this.bestFloor = 1;    // deepest floor ever reached; kept across deaths
+    this.shopBought = {};  // how many of each shop item were bought (prices rise)
     this.gold = 0;
     this.autoPlay = true;
     this.speedMultiplier = 1;
@@ -226,21 +234,37 @@ class Game {
     const hero = {};
     for (const k of SAVED_HERO_FIELDS) hero[k] = h[k];
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, gold: this.gold, hero }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, bestFloor: this.bestFloor, gold: this.gold,
+                                                       shopBought: this.shopBought, hero }));
     } catch (e) { /* storage full or blocked: skip */ }
   }
 
   loadGame() {
     try {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
-      this.gold = saved.gold || 0;
-      for (const k of SAVED_HERO_FIELDS) {
-        if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
+      // Everything in a save is cleaned before use (see rules.js), because a
+      // hand-edited save could otherwise make the shop free ("abc" gold), show
+      // Infinity (1e400), or freeze autoplay (-1e308 potions or bought-counts).
+      const floor = cleanNumber(saved && saved.floor, 1, 100000, NaN);
+      if (!saved || !saved.hero || typeof saved.hero !== 'object' || !(floor >= 1)) return null;
+      saved.floor = floor;
+      this.gold = cleanNumber(saved.gold, 0, 1e9, 0);
+      this.bestFloor = Math.max(floor, cleanNumber(saved.bestFloor, 1, 100000, 1));
+      const sb = saved.shopBought && typeof saved.shopBought === 'object' ? saved.shopBought : {};
+      this.shopBought = {};
+      for (const { id } of SHOP_ITEMS) {
+        const n = cleanNumber(sb[id], 0, 1000, 0);
+        if (n > 0) this.shopBought[id] = n;
       }
-      // A broken save with maxXp of 0 or less would make applyXp loop forever.
-      if (!(this.hero.maxXp >= 1)) this.hero.maxXp = 60;
+      loadHeroNumbers(this.hero, saved.hero);
+      const gear = saved.hero.equipment && typeof saved.hero.equipment === 'object' ? saved.hero.equipment : {};
+      for (const slot of ['weapon', 'armor', 'relic']) {
+        const item = cleanGear(gear[slot], slot);
+        if (item) this.hero.equipment[slot] = item;
+      }
       if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
+      this.hero.hp = Math.min(this.hero.hp, this.maxHp);
+      this.hero.mp = Math.min(this.hero.mp, this.hero.maxMp);
       // The badge is static HTML that only level-ups updated, so a loaded
       // level-8 hero still showed "LVL 1".
       document.getElementById('heroLevelBadge').textContent = `LVL ${this.hero.level}`;
@@ -254,6 +278,12 @@ class Game {
   startFloor(floorNum) {
     this.floor = floorNum;
     this.floorDisplay.textContent = this.floor;
+    if (this.floor > this.bestFloor) {
+      this.bestFloor = this.floor;
+      if (this.floor > 1) this.log(`New record: Floor ${this.floor}!`, 'level');
+    }
+    const best = document.getElementById('bestDisplay');
+    if (best) best.textContent = this.bestFloor;
     this.isFloorCleared = false;
     this.dungeon = this.dungeonGen.generate(this.floor);
     this.fade = 0.45;
@@ -294,8 +324,8 @@ class Game {
       const room = this.dungeon.rooms[i];
       const count = Math.floor(Math.random() * 2) + 1;
       for (let c = 0; c < count; c++) {
-        const typeIdx = Math.min(Math.floor(Math.random() * 3), Math.floor((this.floor - 1) / 2));
-        const mType = MONSTER_TYPES[typeIdx].type;
+        const choices = spawnableTypes(MONSTER_TYPES, this.floor);
+        const mType = choices[Math.floor(Math.random() * choices.length)].type;
         const mx = room.x + Math.floor(Math.random() * (room.w - 2)) + 1;
         const my = room.y + Math.floor(Math.random() * (room.h - 2)) + 1;
         // One bug per tile, and never on a chest or the stairs.
@@ -331,6 +361,8 @@ class Game {
       facing: -1,
       attackCooldown: 0,
       spd: template.spd,
+      attackRate: template.attackRate || 1.0,   // seconds between hits
+      regen: template.regen || 0,               // share of max HP healed per second
       moveCooldown: Math.random(),   // so a room of bugs doesn't move in lockstep
       animTimer: Math.random() * 10
     });
@@ -481,6 +513,8 @@ class Game {
     this.sound.playPotion();
     this.addFloatingText(`+${healAmt} HP`, this.hero.x + 16, this.hero.y, '#34d399');
     this.log(`Used Health Potion! Restored ${healAmt} HP.`, 'heal');
+    // Drinking one while the shop is open frees a bag slot.
+    if (!this.overlay.classList.contains('hidden') && this.hero.hp > 0) this.renderShop();
     this.updateBars();
     this.updateStatsUI();
   }
@@ -704,7 +738,9 @@ class Game {
         this.aiActionText.textContent = 'AI: Descending to Next Floor...';
         const dst = Math.hypot(this.dungeon.stairsPos.x - this.hero.gx, this.dungeon.stairsPos.y - this.hero.gy);
         if (dst === 0) {
-          this.triggerNextFloorModal();
+          // Only once: the AI ticks every 0.15s while standing here, and each
+          // call rebuilt the shop (eating clicks) and queued another descent.
+          if (this.overlay.classList.contains('hidden')) this.triggerNextFloorModal();
         } else {
           const path = this.dungeonGen.findPath({ x: this.hero.gx, y: this.hero.gy }, this.dungeon.stairsPos);
           if (path.length > 0) this.moveHeroTo(path[0].x, path[0].y);
@@ -761,13 +797,51 @@ class Game {
     return this.monsters.find(m => m.gx === gx && m.gy === gy);
   }
 
+  /** Buy one shop item; returns whether it worked. */
+  buy(id) {
+    const state = { gold: this.gold, bought: this.shopBought, hero: this.hero };
+    if (!buyFromShop(state, id)) return false;
+    this.gold = state.gold;
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    this.log(`Bought ${item.name}.`, 'loot');
+    this.sound.playCoin();
+    this.updateStatsUI();
+    this.updateBars();
+    this.renderShop();
+    return true;
+  }
+
+  /** The shop on the floor-cleared screen: each item, its price, and whether you can pay. */
+  renderShop() {
+    const row = document.getElementById('shopRow');
+    if (!row) return;
+    row.innerHTML = '';
+    for (const item of SHOP_ITEMS) {
+      const cost = shopPrice(item, this.shopBought[item.id]);
+      const full = item.id === 'potion' && this.hero.potions >= MAX_POTIONS;
+      const btn = document.createElement('button');
+      btn.className = 'shop-item';
+      btn.disabled = this.gold < cost || full;
+      btn.innerHTML = `<span>${item.icon}</span><span>${item.name}<small>${full ? 'Bag full' : item.desc || '+1 potion'}</small></span><span class="price">${cost}g</span>`;
+      btn.addEventListener('click', () => this.buy(item.id));
+      row.appendChild(btn);
+    }
+    row.classList.remove('hidden');
+  }
+
   triggerNextFloorModal() {
     this.overlayTitle.textContent = `FLOOR ${this.floor} CLEARED!`;
-    this.overlayMsg.textContent = `All bugs patched successfully. Ready for Floor ${this.floor + 1}?`;
+    this.overlayMsg.textContent = `All bugs patched. Spend your gold, then on to Floor ${this.floor + 1}.`;
     this.overlayBtn.textContent = `ENTER FLOOR ${this.floor + 1}`;
+    this.renderShop();
     this.overlay.classList.remove('hidden');
 
     if (this.autoPlay) {
+      // The AI shops too: potions up to 3, then the cheapest upgrade, while it can pay.
+      // At most 50 buys a floor, so no save, however strange, can keep it here.
+      for (let n = 0, id; n < 50 && (id = nextShopBuy({ gold: this.gold, bought: this.shopBought, hero: this.hero })); n++) {
+        if (!this.buy(id)) break;
+      }
       setTimeout(() => {
         if (!this.overlay.classList.contains('hidden') && this.hero.hp > 0) {
           this.overlay.classList.add('hidden');
@@ -844,6 +918,7 @@ class Game {
     this.monsters.forEach(m => {
       if (this.hero.hp <= 0) return;   // the hero fell earlier this frame
       m.animTimer += dt * 4;
+      if (m.regen) m.hp = Math.min(m.maxHp, m.hp + m.maxHp * m.regen * dt);
       m.attackCooldown -= dt;
 
       // Distance to hero
@@ -854,7 +929,7 @@ class Game {
       m.y += (m.gy * TILE_SIZE - m.y) * Math.min(1, 10 * dt);
       if (dist <= 1.2 && m.attackCooldown <= 0) {
         // Monster attacks hero
-        m.attackCooldown = 1.0;
+        m.attackCooldown = m.attackRate;
         const monsterDmg = monsterHitDamage(m.atk, this.totalDefense, this.hero.shieldActiveTimer > 0);
         this.hero.hp -= monsterDmg;
         this.hero.hurtTimer = 0.18;
@@ -868,6 +943,7 @@ class Game {
           this.overlayTitle.textContent = 'GAME OVER';
           this.overlayMsg.textContent = 'The system crashed under unresolved exceptions.';
           this.overlayBtn.textContent = 'RESPAWN';
+          document.getElementById('shopRow')?.classList.add('hidden');
           this.overlay.classList.remove('hidden');
         }
       }
