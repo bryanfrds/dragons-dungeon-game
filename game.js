@@ -235,6 +235,8 @@ class Game {
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }
+      // A broken save with maxXp of 0 or less would make applyXp loop forever.
+      if (!(this.hero.maxXp >= 1)) this.hero.maxXp = 60;
       if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
       this.log(`Save loaded: Floor ${saved.floor}, Level ${this.hero.level}.`, 'system');
       return saved;
@@ -729,7 +731,10 @@ class Game {
     if (dist > CHASE_RANGE || dist <= 1.2 || m.moveCooldown > 0) return;
     const path = this.dungeonGen.findPath({ x: m.gx, y: m.gy }, { x: this.hero.gx, y: this.hero.gy });
     const next = path[0];
-    if (!next || (next.x === this.hero.gx && next.y === this.hero.gy) || this.monsterAt(next.x, next.y)) return;
+    if (!next || (next.x === this.hero.gx && next.y === this.hero.gy) || this.monsterAt(next.x, next.y)) {
+      m.moveCooldown = stepSeconds(m.spd);   // wait a step before searching again
+      return;
+    }
     m.facing = next.x >= m.gx ? 1 : -1;
     m.gx = next.x;
     m.gy = next.y;
