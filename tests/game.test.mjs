@@ -403,3 +403,31 @@ test('no save can freeze autoplay shopping: at most 50 buys a floor', () => {
   assert.ok(buys <= 50, `${buys} buys`);
   assert.equal(game.hero.potions, 3);
 });
+
+test('loading uses the cleaned gear and caps HP and MP at their max', () => {
+  const game = makeGame();
+  ctx.localStorage.setItem('pixelDungeonSave', '{"floor":2,"gold":5,"hero":{"level":3,' +
+    '"hp":1e6,"maxHp":100,"mp":1e6,"maxMp":50,' +
+    '"equipment":{"weapon":{"name":"Bad","atk":"abc"},"relic":{"name":"Odd","maxHp":"50","spd":99}}}}');
+  assert.ok(game.loadGame());
+  assert.equal(typeof game.totalAttack, 'number');
+  assert.equal(game.totalAttack, 8);              // "abc" attack counts as 0, not text glued on
+  assert.equal(game.maxHp, 150);                  // "50" HP from the ring is a number
+  assert.equal(game.hero.equipment.relic.spd, 5);
+  assert.equal(game.hero.hp, game.maxHp);
+  assert.equal(game.hero.mp, 50);
+});
+
+test('a normal save loads back exactly as it was saved', () => {
+  const game = makeGame();
+  game.hero.level = 9; game.hero.mp = 37.25; game.hero.baseSpd = 3.5;
+  game.hero.equipment.relic = { slot: 'relic', name: 'Boots of Hermes', spd: 1.5, rarity: 'epic', icon: '👟' };
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(4);
+  game.saveGame();
+  const again = makeGame();
+  assert.ok(again.loadGame());
+  for (const k of ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp', 'baseAtk', 'baseDef', 'baseSpd', 'potions'])
+    assert.equal(again.hero[k], game.hero[k], k);
+  assert.deepEqual({ ...again.hero.equipment.relic }, { ...game.hero.equipment.relic });
+});

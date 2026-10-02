@@ -136,7 +136,7 @@ test('a hand-edited hero loads as sane numbers', () => {
                  baseAtk: 8, baseDef: 4, baseSpd: 3.5, lifesteal: 0, potions: 2 };
   loadHeroNumbers(hero, { level: '9', xp: 1e9, maxXp: 0, hp: 'abc', maxHp: '150', potions: -1e308,
                           baseSpd: 999, lifesteal: -5, baseAtk: {} });
-  assert.deepEqual({ ...hero }, { level: 9, xp: 0, maxXp: 1, hp: 100, maxHp: 150, mp: 50, maxMp: 50,
+  assert.deepEqual({ ...hero }, { level: 9, xp: 9, maxXp: 10, hp: 100, maxHp: 150, mp: 50, maxMp: 50,
                                   baseAtk: 8, baseDef: 4, baseSpd: 20, lifesteal: 0, potions: 0 });
 });
 
@@ -146,4 +146,5 @@ test('saved gear is kept only if it is an object, with its numbers cleaned', () 
   assert.equal(cleanGear([1], 'weapon'), null);
   const g = cleanGear({ name: 'X'.repeat(99), atk: '1e9', rarity: 'mythic', evil: 1 }, 'weapon');
   assert.deepEqual({ ...g }, { slot: 'weapon', name: 'X'.repeat(40), rarity: 'common', atk: 1e5 });
+  assert.equal(cleanGear({ spd: 99 }, 'relic').spd, 5);
 });
