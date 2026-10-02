@@ -16,10 +16,18 @@ A retro dungeon crawler that plays itself. A pixel hero works down through proce
 
 - **It plays itself.** The AI goes for the closest bug, finds a route to it with breadth-first search, fights it, drinks a potion below 35% HP, spins a Whirlwind when two or more bugs are next to it, and loots chests before taking the stairs.
 - **Take over any time.** Tab switches between the AI and the keyboard.
-- **Bugs to fix:** Syntax Error (slime), Memory Leak (ghost), Null Pointer (skeleton), and a Merge Conflict boss on every fifth floor. They get tougher the deeper you go.
+- **Bugs to fix**, each with its own habits. They chase you once you're within 5 tiles, and get tougher the deeper you go:
+  - **Syntax Error** (slime): slow. From floor 1.
+  - **Memory Leak** (ghost): quick. From floor 3.
+  - **Race Condition** (two sparks): fragile, fast, and strikes twice as often. From floor 4.
+  - **Null Pointer** (skeleton): hits hard. From floor 5.
+  - **Infinite Loop** (a ring chasing its tail): heals itself unless you finish it quickly. From floor 7.
+  - **Merge Conflict**: the boss, every fifth floor.
+- **A shop between floors.** Spend gold on potions or permanent upgrades: +3 attack, +2 defence or +20 max HP. Each upgrade costs more than the last. On autoplay the AI shops too, stocking up to 3 potions and then buying the cheapest upgrade it can afford.
+- **Best floor**: the deepest floor you've reached is kept in the header, even after you die.
 - **Loot** in four rarities: common, rare, epic and legendary. Better swords and armor are equipped automatically, and every new relic (ring, fang, boots or stone) is put on.
 - **Levels:** every level-up raises HP, MP, attack and defence and gives a potion (you can carry up to 5).
-- **Saves itself** in your browser every few seconds: floor, gold, level and gear.
+- **Saves itself** in your browser every few seconds: floor, best floor, gold, level, gear and shop upgrades.
 - **8-bit sound** synthesised with the Web Audio API, so there are no audio files.
 - **Speed control** at 1×, 2× or 4×.
 
