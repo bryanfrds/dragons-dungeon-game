@@ -63,3 +63,38 @@ test('new bug types unlock on their floors, and the boss never rolls as a normal
   assert.equal(names(4), 'slime,ghost,race');
   assert.equal(names(9), 'slime,ghost,race,loop');
 });
+
+const shop = () => vm.runInContext('({ buyFromShop, nextShopBuy, shopPrice, SHOP_ITEMS })', ctx);
+const shopState = (gold, hero = {}) => ({ gold, bought: {},
+  hero: { potions: 0, baseAtk: 8, baseDef: 4, maxHp: 100, hp: 100, ...hero } });
+
+test('buying takes the gold, applies the upgrade, and the next one costs more', () => {
+  const { buyFromShop, shopPrice, SHOP_ITEMS } = shop();
+  const state = shopState(1000);
+  assert.equal(buyFromShop(state, 'atk'), true);
+  assert.equal(state.hero.baseAtk, 11);
+  assert.equal(state.gold, 940);
+  const whetstone = SHOP_ITEMS.find(i => i.id === 'atk');
+  assert.ok(shopPrice(whetstone, 1) > shopPrice(whetstone, 0));
+  assert.equal(buyFromShop(state, 'hp'), true);
+  assert.deepEqual([state.hero.maxHp, state.hero.hp], [120, 120]);
+});
+
+test("the shop refuses what you can't afford, unknown items, and a sixth potion", () => {
+  const { buyFromShop } = shop();
+  const poor = shopState(10);
+  assert.equal(buyFromShop(poor, 'potion'), false);
+  assert.equal(buyFromShop(shopState(1000), 'sword'), false);
+  const full = shopState(1000, { potions: 5 });
+  assert.equal(buyFromShop(full, 'potion'), false);
+  assert.equal(full.gold, 1000);
+});
+
+test('the AI buys potions up to 3 first, then the cheapest upgrade it can afford', () => {
+  const { buyFromShop, nextShopBuy } = shop();
+  const state = shopState(200, { potions: 1 });
+  const bought = [];
+  for (let id; (id = nextShopBuy(state)); ) { assert.ok(buyFromShop(state, id)); bought.push(id); }
+  assert.deepEqual(bought, ['potion', 'potion', 'atk', 'def']);
+  assert.equal(state.gold, 20);
+});
