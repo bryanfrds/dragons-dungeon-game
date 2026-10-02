@@ -98,3 +98,13 @@ test('the AI buys potions up to 3 first, then the cheapest upgrade it can afford
   assert.deepEqual(bought, ['potion', 'potion', 'atk', 'def']);
   assert.equal(state.gold, 20);
 });
+
+test('a broken bought-count can never make an item free', () => {
+  const { buyFromShop } = shop();
+  for (const bad of ['abc', -1e308, NaN]) {
+    const state = shopState(0);
+    state.bought.atk = bad;
+    assert.equal(buyFromShop(state, 'atk'), false, String(bad));
+    assert.equal(state.hero.baseAtk, 8);
+  }
+});

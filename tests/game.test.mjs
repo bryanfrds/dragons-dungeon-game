@@ -9,15 +9,29 @@ import vm from 'node:vm';
 
 // A canvas that accepts any drawing call and does nothing, for the floor layer.
 const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+// A stand-in DOM element: enough for the game to fill in text, add buttons and
+// toggle classes, with the classes kept so tests can check them.
+function fakeElement() {
+  const classes = new Set();
+  return {
+    children: [], textContent: '', innerHTML: '', disabled: false,
+    getContext: () => noop,
+    addEventListener(type, fn) { this.onclick = fn; },
+    appendChild(child) { this.children.push(child); },
+    classList: { add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c) },
+  };
+}
 const elements = {};
 const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSearchParams,
-              document: { createElement: () => ({ getContext: () => noop }),
-                          getElementById: (id) => (elements[id] ||= {}) },
+              setTimeout: () => 0,                 // the auto-descend timer is not run in tests
+              document: { createElement: fakeElement,
+                          getElementById: (id) => (elements[id] ||= fakeElement()) },
               localStorage: { store: {}, getItem(k) { return this.store[k] ?? null; }, setItem(k, v) { this.store[k] = v; } } };
 vm.createContext(ctx);
 const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
 vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('tiles.js') + '\n' + src('game.js') +
-  '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES; this.LOOT_TABLE = LOOT_TABLE;', ctx);
+  '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES; this.LOOT_TABLE = LOOT_TABLE;' +
+  '\nthis.SHOP_ITEMS = SHOP_ITEMS;', ctx);
 const { Game, TILE, MONSTER_TYPES } = ctx;
 const { DungeonGenerator } = ctx.window;
 
@@ -40,10 +54,11 @@ function makeGame(W = 12, H = 12) {
       equipment: { weapon: { atk: 4 }, armor: { def: 2 }, relic: { maxHp: 10 } },
     },
     monsters: [], particles: [], floatingTexts: [], keys: {}, autoPlay: true, aiCooldown: 0,
-    floor: 1, bestFloor: 1, gold: 0, logs: 0,
+    floor: 1, bestFloor: 1, gold: 0, logs: 0, shopBought: {}, shake: 0, fade: 0,
     sound: new Proxy({}, { get: () => () => {} }),
-    overlay: { classList: { contains: () => true, add() {}, remove() {} } },
+    overlay: (() => { const o = fakeElement(); o.classList.add('hidden'); return o; })(),
     aiActionText: {}, floorDisplay: {}, zoneName: {},
+    overlayTitle: fakeElement(), overlayMsg: fakeElement(), overlayBtn: fakeElement(),
   });
   for (const m of ['updateBars', 'updateStatsUI', 'updateMonstersCount', 'addLootDrop', 'triggerNextFloorModal'])
     game[m] = () => {};
@@ -275,4 +290,78 @@ test('the best floor is kept when you die and start over, and saved', () => {
   assert.equal(elements.bestDisplay.textContent, 6);
   game.saveGame();
   assert.equal(JSON.parse(ctx.localStorage.getItem('pixelDungeonSave')).bestFloor, 6);
+});
+
+test('buying in the shop takes the gold and applies the upgrade', () => {
+  const game = makeGame();
+  game.gold = 200;
+  assert.equal(game.buy('def'), true);
+  assert.equal(game.gold, 140);
+  assert.equal(game.totalDefense, 4 + 2 + 2);      // base + armor + plating
+  assert.equal(game.buy('nonsense'), false);
+});
+
+test('on autoplay the floor-cleared box spends gold, and opens only once', () => {
+  const game = makeGame();
+  delete game.triggerNextFloorModal;               // use the real one
+  let opened = 0;
+  const real = Game.prototype.triggerNextFloorModal;
+  game.triggerNextFloorModal = function () { opened++; return real.call(this); };
+  game.gold = 300;
+  game.hero.potions = 0;
+  game.hero.gx = game.dungeon.stairsPos.x; game.hero.gy = game.dungeon.stairsPos.y;
+  for (let i = 0; i < 30; i++) game.updateAI(0.2);  // standing on the stairs a while
+  assert.equal(opened, 1);
+  assert.equal(game.hero.potions, 3);
+  assert.ok(game.gold < 300 - 90);
+});
+
+test('the shop row is hidden on game over', () => {
+  const game = makeGame();
+  game.autoPlay = false;
+  elements.shopRow = fakeElement();
+  game.renderShop();
+  assert.equal(elements.shopRow.classList.contains('hidden'), false);
+  game.hero.hp = 1;
+  game.spawnMonster('skeleton', 2, 1);
+  game.monsters[0].attackCooldown = 0;
+  game.update(1 / 60);
+  assert.equal(game.hero.hp, 0);
+  assert.equal(elements.shopRow.classList.contains('hidden'), true);
+});
+
+test('shop purchases and the best floor survive a save and load', () => {
+  const game = makeGame();
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(7);
+  game.gold = 500;
+  game.buy('atk'); game.buy('atk'); game.buy('hp');
+  game.saveGame();
+  const again = makeGame();
+  assert.ok(again.loadGame());
+  assert.deepEqual({ ...again.shopBought }, { atk: 2, hp: 1 });
+  assert.equal(again.bestFloor, 7);
+});
+
+test('a tampered save cannot make the shop free or freeze autoplay', () => {
+  const game = makeGame();
+  ctx.localStorage.setItem('pixelDungeonSave', JSON.stringify({ floor: 2, gold: 0, bestFloor: 1e400,
+    shopBought: { atk: -1e308, def: 'abc', hp: 5e9, potion: [], bogus: 3 }, hero: { level: 2 } }));
+  assert.ok(game.loadGame());
+  assert.deepEqual({ ...game.shopBought }, { hp: 1000 });
+  assert.equal(game.bestFloor, 2);                 // Infinity rejected, the floor itself kept
+  assert.equal(game.buy('def'), false);            // no gold: "abc" no longer makes it free
+  game.gold = 1e6;
+  game.autoPlay = true;
+  Game.prototype.triggerNextFloorModal.call(game); // must return, not loop
+  assert.ok(game.gold < 1e6);
+});
+
+test('floor 1 only ever spawns slimes, never the new bugs or the boss', () => {
+  for (let i = 0; i < 40; i++) {
+    const game = makeGame();
+    game.dungeonGen = new DungeonGenerator(25, 16);
+    game.startFloor(1);
+    assert.ok(game.monsters.every(m => m.type === 'slime'), game.monsters.map(m => m.type).join());
+  }
 });
