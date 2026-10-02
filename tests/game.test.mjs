@@ -7,10 +7,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSearchParams };
+// A canvas that accepts any drawing call and does nothing, for the floor layer.
+const noop = new Proxy(function () {}, { get: () => noop, apply: () => noop });
+const ctx = { window: { addEventListener() {} }, location: { search: '' }, URLSearchParams,
+              document: { createElement: () => ({ getContext: () => noop }) } };
 vm.createContext(ctx);
 const src = (f) => readFileSync(new URL(`../${f}`, import.meta.url), 'utf8');
-vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('game.js') +
+vm.runInContext(src('dungeon.js') + '\n' + src('rules.js') + '\n' + src('tiles.js') + '\n' + src('game.js') +
   '\nthis.Game = Game; this.TILE = TILE; this.MONSTER_TYPES = MONSTER_TYPES; this.LOOT_TABLE = LOOT_TABLE;', ctx);
 const { Game, TILE, MONSTER_TYPES } = ctx;
 const { DungeonGenerator } = ctx.window;
