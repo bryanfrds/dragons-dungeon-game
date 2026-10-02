@@ -1,10 +1,11 @@
 // Pixel Dungeon Crawler - Main Game Loop & State Manager
 
 const MONSTER_TYPES = [
-  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399' },
-  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8' },
-  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171' },
-  { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24' }
+  // spd: tiles per second when chasing the hero. Ghosts are quick, slimes ooze.
+  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2 },
+  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2 },
+  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6 },
+  { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24', spd: 1.0 }
 ];
 
 const LOOT_TABLE = [
@@ -26,6 +27,7 @@ const LOOT_TABLE = [
 ];
 
 const SAVE_KEY = 'pixelDungeonSave';
+const CHASE_RANGE = 5;   // tiles: how close the hero has to be before a bug gives chase
 const SAVED_HERO_FIELDS = ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp',
   'baseAtk', 'baseDef', 'baseSpd', 'lifesteal', 'potions', 'equipment'];
 
@@ -84,6 +86,7 @@ class Game {
       potions: 2,
       isAttacking: false,
       attackCooldown: 0,
+      moveCooldown: 0,
       shieldActiveTimer: 0,
       skills: {
         whirlwind: { cd: 0, maxCd: 6 },
@@ -232,7 +235,9 @@ class Game {
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }
-      if (this.hero.hp <= 0) this.hero.hp = this.hero.maxHp;
+      // A broken save with maxXp of 0 or less would make applyXp loop forever.
+      if (!(this.hero.maxXp >= 1)) this.hero.maxXp = 60;
+      if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
       this.log(`Save loaded: Floor ${saved.floor}, Level ${this.hero.level}.`, 'system');
       return saved;
     } catch (e) {
@@ -285,6 +290,8 @@ class Game {
         const mType = MONSTER_TYPES[typeIdx].type;
         const mx = room.x + Math.floor(Math.random() * (room.w - 2)) + 1;
         const my = room.y + Math.floor(Math.random() * (room.h - 2)) + 1;
+        // One bug per tile, and never on a chest or the stairs.
+        if (this.monsterAt(mx, my) || this.dungeon.grid[my][mx] !== TILE.FLOOR) continue;
         this.spawnMonster(mType, mx, my);
       }
     }
@@ -315,6 +322,8 @@ class Game {
       gold: Math.floor(template.gold * scale),
       facing: -1,
       attackCooldown: 0,
+      spd: template.spd,
+      moveCooldown: Math.random(),   // so a room of bugs doesn't move in lockstep
       animTimer: Math.random() * 10
     });
   }
@@ -330,6 +339,11 @@ class Game {
 
   get totalSpeed() {
     return this.hero.baseSpd + (this.hero.equipment.relic?.spd || 0);
+  }
+
+  /** Max HP including the ring's bonus. hero.maxHp is the base that levels raise. */
+  get maxHp() {
+    return this.hero.maxHp + (this.hero.equipment.relic?.maxHp || 0);
   }
 
   get totalLifesteal() {
@@ -350,7 +364,8 @@ class Game {
     document.getElementById('eqArmorStat').textContent = `+${this.hero.equipment.armor?.def || 0} Def`;
 
     document.getElementById('eqRelicName').textContent = this.hero.equipment.relic?.name || 'Empty';
-    document.getElementById('eqRelicStat').textContent = this.hero.equipment.relic?.lifesteal ? `+${this.hero.equipment.relic.lifesteal}% Lifesteal` : `+${this.hero.equipment.relic?.maxHp || 10} HP`;
+    // Every bonus the ring has. Boots of Hermes used to read "+10 HP" (it's speed).
+    document.getElementById('eqRelicStat').textContent = this.describeItem(this.hero.equipment.relic || {});
 
     document.getElementById('potionCount').textContent = this.hero.potions;
   }
@@ -383,15 +398,24 @@ class Game {
         <span class="loot-icon">${item.icon || '📦'}</span>
         <div style="flex:1">
           <b style="color:#fff">${item.name}</b>
-          <div style="font-size:9px; color:#38bdf8">${item.atk ? `+${item.atk} Atk` : item.def ? `+${item.def} Def` : `+${item.lifesteal || 10}% Boost`} (${item.rarity.toUpperCase()})</div>
+          <div style="font-size:9px; color:#38bdf8">${this.describeItem(item)} (${item.rarity.toUpperCase()})</div>
         </div>
       `;
       this.lootFeed.appendChild(card);
     });
   }
 
+  /** "+14 Atk", "+12 Def", or a ring's bonuses, e.g. "+50 HP, +15% Lifesteal". */
+  describeItem(item) {
+    if (item.atk) return `+${item.atk} Atk`;
+    if (item.def) return `+${item.def} Def`;
+    return [item.maxHp && `+${item.maxHp} HP`, item.lifesteal && `+${item.lifesteal}% Lifesteal`,
+            item.spd && `+${item.spd} Spd`].filter(Boolean).join(', ') || 'No bonus';
+  }
+
   // Abilities
   triggerWhirlwind() {
+    if (this.hero.hp <= 0) return;   // see update(): nothing happens while dead
     if (this.hero.mp < 15 || this.hero.skills.whirlwind.cd > 0) return;
     this.hero.mp -= 15;
     this.hero.skills.whirlwind.cd = this.hero.skills.whirlwind.maxCd;
@@ -428,20 +452,24 @@ class Game {
   }
 
   triggerShield() {
+    if (this.hero.hp <= 0) return;
     if (this.hero.mp < 20 || this.hero.skills.shield.cd > 0) return;
     this.hero.mp -= 20;
     this.hero.skills.shield.cd = this.hero.skills.shield.maxCd;
     this.hero.shieldActiveTimer = 4.0;
     this.sound.playShield();
-    this.log('Hero activated Iron Wall! +100% Defense for 4s.', 'heal');
+    this.log('Hero activated Iron Wall! 2.5x Defense for 4s.', 'heal');
     this.updateBars();
   }
 
   usePotion() {
-    if (this.hero.potions <= 0 || this.hero.hp >= this.hero.maxHp) return;
+    // A potion at 0 HP used to bring the hero back while the game-over box was
+    // up, and its button then skipped to the next floor instead of respawning.
+    if (this.hero.hp <= 0) return;
+    if (this.hero.potions <= 0 || this.hero.hp >= this.maxHp) return;
     this.hero.potions--;
-    const healAmt = Math.floor(this.hero.maxHp * 0.5);
-    this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + healAmt);
+    const healAmt = Math.floor(this.maxHp * 0.5);
+    this.hero.hp = Math.min(this.maxHp, this.hero.hp + healAmt);
     this.sound.playPotion();
     this.addFloatingText(`+${healAmt} HP`, this.hero.x + 16, this.hero.y, '#34d399');
     this.log(`Used Health Potion! Restored ${healAmt} HP.`, 'heal');
@@ -450,7 +478,7 @@ class Game {
   }
 
   manualAttack() {
-    if (this.hero.attackCooldown > 0) return;
+    if (this.hero.hp <= 0 || this.hero.attackCooldown > 0) return;
     this.hero.attackCooldown = 0.35;
     this.hero.isAttacking = true;
     this.sound.playSwing();
@@ -475,7 +503,7 @@ class Game {
     // Lifesteal heal
     if (this.totalLifesteal > 0) {
       const heal = Math.max(1, Math.floor(dmg * (this.totalLifesteal / 100)));
-      this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + heal);
+      this.hero.hp = Math.min(this.maxHp, this.hero.hp + heal);
       this.addFloatingText(`+${heal}`, this.hero.x + 16, this.hero.y, '#34d399');
     }
 
@@ -525,56 +553,38 @@ class Game {
     this.addLootDrop(drop);
     this.sound.playCoin();
 
-    // Auto-Equip if superior
-    let equipped = false;
-    if (drop.slot === 'weapon' && (!this.hero.equipment.weapon || drop.atk > this.hero.equipment.weapon.atk)) {
-      this.hero.equipment.weapon = drop;
-      equipped = true;
-    } else if (drop.slot === 'armor' && (!this.hero.equipment.armor || drop.def > this.hero.equipment.armor.def)) {
-      this.hero.equipment.armor = drop;
-      equipped = true;
-    } else if (drop.slot === 'relic') {
-      this.hero.equipment.relic = drop;
-      equipped = true;
-    }
-
-    if (equipped) {
+    // Equip only if it beats what's worn. Rings used to be swapped in whatever
+    // they were, so a legendary Infinity Stone could be lost to a Silver Ring.
+    if (isUpgrade(this.hero.equipment, drop)) {
+      this.hero.equipment[drop.slot] = drop;
+      this.hero.hp = Math.min(this.hero.hp, this.maxHp);   // a ring with less HP lowers the cap
       this.log(`✨ Equipped new gear: ${drop.name} (${drop.rarity.toUpperCase()})!`, 'loot');
       this.updateStatsUI();
     }
   }
 
   gainXp(amt) {
-    this.hero.xp += amt;
-    if (this.hero.xp >= this.hero.maxXp) {
-      this.hero.xp -= this.hero.maxXp;
-      this.hero.level++;
-      this.hero.maxXp = Math.floor(this.hero.maxXp * 1.4);
-      this.hero.maxHp += 20;
-      this.hero.hp = this.hero.maxHp;
-      this.hero.maxMp += 10;
+    const levels = applyXp(this.hero, amt);   // every level the XP pays for
+    if (levels > 0) {
+      this.hero.hp = this.maxHp;
       this.hero.mp = this.hero.maxMp;
-      this.hero.baseAtk += 3;
-      this.hero.baseDef += 2;
-      this.hero.potions = Math.min(5, this.hero.potions + 1);
-
       this.sound.playLevelUp();
       this.log(`🎉 LEVEL UP! Reached Level ${this.hero.level}! Stats increased.`, 'level');
       document.getElementById('heroLevelBadge').textContent = `LVL ${this.hero.level}`;
-
-      this.addFloatingText(`LEVEL UP!`, this.hero.x + 16, this.hero.y - 10, '#fbbf24');
+      this.addFloatingText(levels > 1 ? `LEVEL UP x${levels}!` : 'LEVEL UP!',
+                           this.hero.x + 16, this.hero.y - 10, '#fbbf24');
       this.updateStatsUI();
     }
     this.updateBars();
   }
 
   updateBars() {
-    const hpPct = Math.max(0, (this.hero.hp / this.hero.maxHp) * 100);
+    const hpPct = Math.max(0, (this.hero.hp / this.maxHp) * 100);
     const mpPct = Math.max(0, (this.hero.mp / this.hero.maxMp) * 100);
     const xpPct = Math.max(0, (this.hero.xp / this.hero.maxXp) * 100);
 
     this.hpBar.style.width = `${hpPct}%`;
-    this.hpText.textContent = `${this.hero.hp} / ${this.hero.maxHp} HP`;
+    this.hpText.textContent = `${this.hero.hp} / ${this.maxHp} HP`;
 
     this.mpBar.style.width = `${mpPct}%`;
     this.mpText.textContent = `${this.hero.mp} / ${this.hero.maxMp} MP`;
@@ -616,13 +626,16 @@ class Game {
     this.aiCooldown = 0.15; // AI tick rate
 
     // 1. Check if low HP -> drink potion
-    if (this.hero.hp < this.hero.maxHp * 0.35 && this.hero.potions > 0) {
+    if (this.hero.hp < this.maxHp * 0.35 && this.hero.potions > 0) {
       this.usePotion();
     }
 
     // 2. Check if surrounded by >= 2 monsters -> trigger Whirlwind
     const adjacentCount = this.monsters.filter(m => Math.hypot(m.gx - this.hero.gx, m.gy - this.hero.gy) <= 1.5).length;
-    if (adjacentCount >= 2 && this.hero.skills.whirlwind.cd <= 0) {
+    // Only when there's MP for it: with the cooldown ready but under 15 MP,
+    // Whirlwind did nothing yet the AI still skipped its turn, so it stood there
+    // being hit until the MP came back.
+    if (adjacentCount >= 2 && this.hero.skills.whirlwind.cd <= 0 && this.hero.mp >= 15) {
       this.triggerWhirlwind();
       return;
     }
@@ -684,14 +697,52 @@ class Game {
     }
   }
 
+  /**
+   * Step one tile, at most once per stepSeconds(speed). Movement used to have no
+   * limit: holding a key moved a tile every frame (60 a second), the AI moved on
+   * every 0.15s tick, and the speed stat - Boots of Hermes included - did nothing.
+   */
   moveHeroTo(gx, gy) {
-    if (this.dungeonGen.isWalkable(gx, gy)) {
+    if (this.hero.moveCooldown > 0) return;
+    // Bugs block the way; walking straight through them looked broken.
+    if (this.dungeonGen.isWalkable(gx, gy) && !this.monsterAt(gx, gy)) {
+      // += keeps the part of a frame that overshot the last step (at most one
+      // frame, since the cooldown only counts down while above 0), so the real
+      // rate matches the speed stat instead of falling a little short.
+      this.hero.moveCooldown += stepSeconds(this.totalSpeed);
+      // The AI decides every 0.15s; without this its steps landed on every
+      // second decision whatever the speed, so Hermes did nothing in autoplay.
+      if (this.autoPlay) this.aiCooldown = this.hero.moveCooldown;
       this.hero.facing = gx >= this.hero.gx ? 1 : -1;
       this.hero.gx = gx;
       this.hero.gy = gy;
       this.hero.targetX = gx * TILE_SIZE;
       this.hero.targetY = gy * TILE_SIZE;
     }
+  }
+
+  /**
+   * Bugs used to stand still until the hero walked up to them. Now one that's
+   * within CHASE_RANGE tiles walks towards the hero at its own speed, without
+   * stepping onto the hero or another bug, and stops once it's next to them.
+   */
+  chaseHero(m, dist, dt) {
+    m.moveCooldown -= dt;
+    if (dist > CHASE_RANGE || dist <= 1.2 || m.moveCooldown > 0) return;
+    const path = this.dungeonGen.findPath({ x: m.gx, y: m.gy }, { x: this.hero.gx, y: this.hero.gy });
+    const next = path[0];
+    if (!next || (next.x === this.hero.gx && next.y === this.hero.gy) || this.monsterAt(next.x, next.y)) {
+      m.moveCooldown = stepSeconds(m.spd);   // wait a step before searching again
+      return;
+    }
+    m.facing = next.x >= m.gx ? 1 : -1;
+    m.gx = next.x;
+    m.gy = next.y;
+    m.moveCooldown = stepSeconds(m.spd);
+  }
+
+  monsterAt(gx, gy) {
+    return this.monsters.find(m => m.gx === gx && m.gy === gy);
   }
 
   triggerNextFloorModal() {
@@ -711,7 +762,7 @@ class Game {
   }
 
   restartGame() {
-    this.hero.hp = this.hero.maxHp;
+    this.hero.hp = this.maxHp;
     this.hero.mp = this.hero.maxMp;
     this.hero.potions = 2;
     this.startFloor(1);
@@ -731,11 +782,19 @@ class Game {
   }
 
   update(dt) {
+    // Dead: nothing moves until RESPAWN. Bugs used to keep hitting the body,
+    // spamming the log and re-opening the game-over box, and the AI kept walking.
+    if (this.hero.hp <= 0) {
+      this.updateEffects(dt);
+      return;
+    }
+
     // Regenerate MP slowly
     this.hero.mp = Math.min(this.hero.maxMp, this.hero.mp + 2.5 * dt);
 
     // Cooldown timers
     if (this.hero.attackCooldown > 0) this.hero.attackCooldown -= dt;
+    if (this.hero.moveCooldown > 0) this.hero.moveCooldown -= dt;
     if (this.hero.skills.whirlwind.cd > 0) this.hero.skills.whirlwind.cd -= dt;
     if (this.hero.skills.shield.cd > 0) this.hero.skills.shield.cd -= dt;
     if (this.hero.shieldActiveTimer > 0) this.hero.shieldActiveTimer -= dt;
@@ -763,18 +822,20 @@ class Game {
 
     // Update Monsters
     this.monsters.forEach(m => {
+      if (this.hero.hp <= 0) return;   // the hero fell earlier this frame
       m.animTimer += dt * 4;
       m.attackCooldown -= dt;
 
       // Distance to hero
       const dist = Math.hypot(this.hero.gx - m.gx, this.hero.gy - m.gy);
+      this.chaseHero(m, dist, dt);
+      // Glide to the tile it's on, the same way the hero does.
+      m.x += (m.gx * TILE_SIZE - m.x) * Math.min(1, 10 * dt);
+      m.y += (m.gy * TILE_SIZE - m.y) * Math.min(1, 10 * dt);
       if (dist <= 1.2 && m.attackCooldown <= 0) {
         // Monster attacks hero
         m.attackCooldown = 1.0;
-        let def = this.totalDefense;
-        if (this.hero.shieldActiveTimer > 0) def *= 2.5;
-
-        const monsterDmg = Math.max(1, m.atk - Math.floor(def * 0.5));
+        const monsterDmg = monsterHitDamage(m.atk, this.totalDefense, this.hero.shieldActiveTimer > 0);
         this.hero.hp -= monsterDmg;
         this.sound.playHit();
         this.addFloatingText(`-${monsterDmg}`, this.hero.x + 16, this.hero.y, '#f87171');
@@ -790,7 +851,12 @@ class Game {
       }
     });
 
-    // Update Particles & Floating Text
+    this.updateEffects(dt);
+    this.updateBars();
+  }
+
+  /** Particles and floating numbers, which keep fading even after death. */
+  updateEffects(dt) {
     this.particles = this.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
@@ -803,8 +869,6 @@ class Game {
       t.life -= dt;
       return t.life > 0;
     });
-
-    this.updateBars();
   }
 
   render() {
