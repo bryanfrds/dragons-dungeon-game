@@ -550,24 +550,15 @@ class Game {
   }
 
   gainXp(amt) {
-    this.hero.xp += amt;
-    if (this.hero.xp >= this.hero.maxXp) {
-      this.hero.xp -= this.hero.maxXp;
-      this.hero.level++;
-      this.hero.maxXp = Math.floor(this.hero.maxXp * 1.4);
-      this.hero.maxHp += 20;
+    const levels = applyXp(this.hero, amt);   // every level the XP pays for
+    if (levels > 0) {
       this.hero.hp = this.maxHp;
-      this.hero.maxMp += 10;
       this.hero.mp = this.hero.maxMp;
-      this.hero.baseAtk += 3;
-      this.hero.baseDef += 2;
-      this.hero.potions = Math.min(5, this.hero.potions + 1);
-
       this.sound.playLevelUp();
       this.log(`🎉 LEVEL UP! Reached Level ${this.hero.level}! Stats increased.`, 'level');
       document.getElementById('heroLevelBadge').textContent = `LVL ${this.hero.level}`;
-
-      this.addFloatingText(`LEVEL UP!`, this.hero.x + 16, this.hero.y - 10, '#fbbf24');
+      this.addFloatingText(levels > 1 ? `LEVEL UP x${levels}!` : 'LEVEL UP!',
+                           this.hero.x + 16, this.hero.y - 10, '#fbbf24');
       this.updateStatsUI();
     }
     this.updateBars();
