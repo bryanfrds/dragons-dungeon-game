@@ -125,8 +125,10 @@ function cleanNumber(value, min, max, fallback, whole = true) {
 // outside is clamped and anything that isn't a number keeps the default, so a
 // hand-edited save can't break levelling, the shop or autoplay.
 const HERO_LIMITS = {
-  level: [1, 1000], xp: [0, 1e9], maxXp: [1, 1e9], hp: [0, 1e6], maxHp: [1, 1e6],
-  mp: [0, 1e6], maxMp: [1, 1e6], baseAtk: [0, 1e6], baseDef: [0, 1e6],
+  // maxXp starts at 10: below that, floor(maxXp * 1.4) never grows, so every
+  // XP point is a level-up. mp is fractional because it regenerates smoothly.
+  level: [1, 1000], xp: [0, 1e9], maxXp: [10, 1e9], hp: [0, 1e6], maxHp: [1, 1e6],
+  mp: [0, 1e6, false], maxMp: [1, 1e6], baseAtk: [0, 1e6], baseDef: [0, 1e6],
   baseSpd: [0.5, 20, false], lifesteal: [0, 100], potions: [0, 5],
 };
 
