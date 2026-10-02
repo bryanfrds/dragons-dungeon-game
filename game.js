@@ -766,6 +766,13 @@ class Game {
   }
 
   update(dt) {
+    // Dead: nothing moves until RESPAWN. Bugs used to keep hitting the body,
+    // spamming the log and re-opening the game-over box, and the AI kept walking.
+    if (this.hero.hp <= 0) {
+      this.updateEffects(dt);
+      return;
+    }
+
     // Regenerate MP slowly
     this.hero.mp = Math.min(this.hero.maxMp, this.hero.mp + 2.5 * dt);
 
@@ -799,6 +806,7 @@ class Game {
 
     // Update Monsters
     this.monsters.forEach(m => {
+      if (this.hero.hp <= 0) return;   // the hero fell earlier this frame
       m.animTimer += dt * 4;
       m.attackCooldown -= dt;
 
@@ -827,7 +835,12 @@ class Game {
       }
     });
 
-    // Update Particles & Floating Text
+    this.updateEffects(dt);
+    this.updateBars();
+  }
+
+  /** Particles and floating numbers, which keep fading even after death. */
+  updateEffects(dt) {
     this.particles = this.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
@@ -840,8 +853,6 @@ class Game {
       t.life -= dt;
       return t.life > 0;
     });
-
-    this.updateBars();
   }
 
   render() {
