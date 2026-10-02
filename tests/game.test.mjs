@@ -421,7 +421,11 @@ test('loading uses the cleaned gear and caps HP and MP at their max', () => {
 test('a normal save loads back exactly as it was saved', () => {
   const game = makeGame();
   game.hero.level = 9; game.hero.mp = 37.25; game.hero.baseSpd = 3.5;
-  game.hero.equipment.relic = { slot: 'relic', name: 'Boots of Hermes', spd: 1.5, rarity: 'epic', icon: '👟' };
+  game.hero.equipment = {
+    weapon: { slot: 'weapon', name: 'Excalibur.js', atk: 35, rarity: 'legendary', icon: '✨' },
+    armor: { slot: 'armor', name: 'Voidplate Cuirass', def: 20, rarity: 'epic', icon: '🦺' },
+    relic: { slot: 'relic', name: 'Infinity Stone', maxHp: 50, lifesteal: 15, rarity: 'legendary', icon: '💎' },
+  };
   game.dungeonGen = new DungeonGenerator(25, 16);
   game.startFloor(4);
   game.saveGame();
@@ -429,5 +433,12 @@ test('a normal save loads back exactly as it was saved', () => {
   assert.ok(again.loadGame());
   for (const k of ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp', 'baseAtk', 'baseDef', 'baseSpd', 'potions'])
     assert.equal(again.hero[k], game.hero[k], k);
-  assert.deepEqual({ ...again.hero.equipment.relic }, { ...game.hero.equipment.relic });
+  for (const slot of ['weapon', 'armor', 'relic'])
+    assert.deepEqual({ ...again.hero.equipment[slot] }, { ...game.hero.equipment[slot] }, slot);
+  // And a ring's speed, which is fractional.
+  game.hero.equipment.relic = { slot: 'relic', name: 'Boots of Hermes', spd: 1.5, rarity: 'epic', icon: '👟' };
+  game.saveGame();
+  const third = makeGame();
+  assert.ok(third.loadGame());
+  assert.deepEqual({ ...third.hero.equipment.relic }, { ...game.hero.equipment.relic });
 });

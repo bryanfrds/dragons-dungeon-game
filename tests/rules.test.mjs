@@ -147,4 +147,6 @@ test('saved gear is kept only if it is an object, with its numbers cleaned', () 
   const g = cleanGear({ name: 'X'.repeat(99), atk: '1e9', rarity: 'mythic', evil: 1 }, 'weapon');
   assert.deepEqual({ ...g }, { slot: 'weapon', name: 'X'.repeat(40), rarity: 'common', atk: 1e5 });
   assert.equal(cleanGear({ spd: 99 }, 'relic').spd, 5);
+  assert.equal(cleanGear({ atk: -9 }, 'weapon').atk, 0);       // gear never subtracts
+  assert.equal(cleanGear({ spd: -9 }, 'relic').spd, 0);
 });
