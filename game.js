@@ -286,6 +286,8 @@ class Game {
         const mType = MONSTER_TYPES[typeIdx].type;
         const mx = room.x + Math.floor(Math.random() * (room.w - 2)) + 1;
         const my = room.y + Math.floor(Math.random() * (room.h - 2)) + 1;
+        // One bug per tile, and never on a chest or the stairs.
+        if (this.monsterAt(mx, my) || this.dungeon.grid[my][mx] !== TILE.FLOOR) continue;
         this.spawnMonster(mType, mx, my);
       }
     }
@@ -688,7 +690,8 @@ class Game {
    */
   moveHeroTo(gx, gy) {
     if (this.hero.moveCooldown > 0) return;
-    if (this.dungeonGen.isWalkable(gx, gy)) {
+    // Bugs block the way; walking straight through them looked broken.
+    if (this.dungeonGen.isWalkable(gx, gy) && !this.monsterAt(gx, gy)) {
       this.hero.moveCooldown = stepSeconds(this.totalSpeed);
       this.hero.facing = gx >= this.hero.gx ? 1 : -1;
       this.hero.gx = gx;
@@ -696,6 +699,10 @@ class Game {
       this.hero.targetX = gx * TILE_SIZE;
       this.hero.targetY = gy * TILE_SIZE;
     }
+  }
+
+  monsterAt(gx, gy) {
+    return this.monsters.find(m => m.gx === gx && m.gy === gy);
   }
 
   triggerNextFloorModal() {
