@@ -60,6 +60,7 @@ class Game {
     // Game state
     this.floor = 1;
     this.bestFloor = 1;    // deepest floor ever reached; kept across deaths
+    this.shopBought = {};  // how many of each shop item were bought (prices rise)
     this.gold = 0;
     this.autoPlay = true;
     this.speedMultiplier = 1;
@@ -233,7 +234,8 @@ class Game {
     const hero = {};
     for (const k of SAVED_HERO_FIELDS) hero[k] = h[k];
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, bestFloor: this.bestFloor, gold: this.gold, hero }));
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ floor: this.floor, bestFloor: this.bestFloor, gold: this.gold,
+                                                       shopBought: this.shopBought, hero }));
     } catch (e) { /* storage full or blocked: skip */ }
   }
 
@@ -243,6 +245,7 @@ class Game {
       if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
       this.gold = saved.gold || 0;
       this.bestFloor = Math.max(saved.floor, Number(saved.bestFloor) || 1);
+      this.shopBought = saved.shopBought && typeof saved.shopBought === 'object' ? saved.shopBought : {};
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }
@@ -777,13 +780,50 @@ class Game {
     return this.monsters.find(m => m.gx === gx && m.gy === gy);
   }
 
+  /** Buy one shop item; returns whether it worked. */
+  buy(id) {
+    const state = { gold: this.gold, bought: this.shopBought, hero: this.hero };
+    if (!buyFromShop(state, id)) return false;
+    this.gold = state.gold;
+    const item = SHOP_ITEMS.find(i => i.id === id);
+    this.log(`Bought ${item.name}.`, 'loot');
+    this.sound.playCoin();
+    this.updateStatsUI();
+    this.updateBars();
+    this.renderShop();
+    return true;
+  }
+
+  /** The shop on the floor-cleared screen: each item, its price, and whether you can pay. */
+  renderShop() {
+    const row = document.getElementById('shopRow');
+    if (!row) return;
+    row.innerHTML = '';
+    for (const item of SHOP_ITEMS) {
+      const cost = shopPrice(item, this.shopBought[item.id]);
+      const full = item.id === 'potion' && this.hero.potions >= MAX_POTIONS;
+      const btn = document.createElement('button');
+      btn.className = 'shop-item';
+      btn.disabled = this.gold < cost || full;
+      btn.innerHTML = `<span>${item.icon}</span><span>${item.name}<small>${full ? 'Bag full' : item.desc || '+1 potion'}</small></span><span class="price">${cost}g</span>`;
+      btn.addEventListener('click', () => this.buy(item.id));
+      row.appendChild(btn);
+    }
+    row.classList.remove('hidden');
+  }
+
   triggerNextFloorModal() {
     this.overlayTitle.textContent = `FLOOR ${this.floor} CLEARED!`;
-    this.overlayMsg.textContent = `All bugs patched successfully. Ready for Floor ${this.floor + 1}?`;
+    this.overlayMsg.textContent = `All bugs patched. Spend your gold, then on to Floor ${this.floor + 1}.`;
     this.overlayBtn.textContent = `ENTER FLOOR ${this.floor + 1}`;
+    this.renderShop();
     this.overlay.classList.remove('hidden');
 
     if (this.autoPlay) {
+      // The AI shops too: potions up to 3, then the cheapest upgrade, while it can pay.
+      for (let id; (id = nextShopBuy({ gold: this.gold, bought: this.shopBought, hero: this.hero })); ) {
+        if (!this.buy(id)) break;
+      }
       setTimeout(() => {
         if (!this.overlay.classList.contains('hidden') && this.hero.hp > 0) {
           this.overlay.classList.add('hidden');
@@ -885,6 +925,7 @@ class Game {
           this.overlayTitle.textContent = 'GAME OVER';
           this.overlayMsg.textContent = 'The system crashed under unresolved exceptions.';
           this.overlayBtn.textContent = 'RESPAWN';
+          document.getElementById('shopRow')?.classList.add('hidden');
           this.overlay.classList.remove('hidden');
         }
       }
