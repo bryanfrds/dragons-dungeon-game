@@ -108,3 +108,12 @@ test('a broken bought-count can never make an item free', () => {
     assert.equal(state.hero.baseAtk, 8);
   }
 });
+
+test('gold that is not a number buys nothing', () => {
+  const { buyFromShop } = shop();
+  for (const bad of ['abc', NaN, undefined]) {
+    const state = shopState(bad);
+    assert.equal(buyFromShop(state, 'atk'), false, String(bad));
+    assert.equal(state.hero.baseAtk, 8);
+  }
+});

@@ -345,12 +345,14 @@ test('shop purchases and the best floor survive a save and load', () => {
 
 test('a tampered save cannot make the shop free or freeze autoplay', () => {
   const game = makeGame();
-  ctx.localStorage.setItem('pixelDungeonSave', JSON.stringify({ floor: 2, gold: 0, bestFloor: 1e400,
-    shopBought: { atk: -1e308, def: 'abc', hp: 5e9, potion: [], bogus: 3 }, hero: { level: 2 } }));
+  // Written as raw text: JSON.stringify would turn 1e400 into null before the game saw it.
+  ctx.localStorage.setItem('pixelDungeonSave', '{"floor":2,"gold":"abc","bestFloor":1e400,' +
+    '"shopBought":{"atk":-1e308,"def":"abc","hp":5e9,"potion":[],"bogus":3},"hero":{"level":2}}');
   assert.ok(game.loadGame());
   assert.deepEqual({ ...game.shopBought }, { hp: 1000 });
   assert.equal(game.bestFloor, 2);                 // Infinity rejected, the floor itself kept
-  assert.equal(game.buy('def'), false);            // no gold: "abc" no longer makes it free
+  assert.equal(game.gold, 0);                      // "abc" gold becomes 0
+  assert.equal(game.buy('def'), false);            // so nothing is free
   game.gold = 1e6;
   game.autoPlay = true;
   Game.prototype.triggerNextFloorModal.call(game); // must return, not loop
@@ -364,4 +366,23 @@ test('floor 1 only ever spawns slimes, never the new bugs or the boss', () => {
     game.startFloor(1);
     assert.ok(game.monsters.every(m => m.type === 'slime'), game.monsters.map(m => m.type).join());
   }
+});
+
+test('a save on floor 1e400 is refused rather than loaded as Infinity', () => {
+  const game = makeGame();
+  ctx.localStorage.setItem('pixelDungeonSave', '{"floor":1e400,"gold":5,"hero":{"level":3}}');
+  assert.equal(game.loadGame(), null);
+});
+
+test('drinking a potion with the shop open frees the potion button', () => {
+  const game = makeGame();
+  game.gold = 500;
+  game.hero.potions = 5;
+  game.hero.hp = 10;
+  game.overlay.classList.remove('hidden');        // the floor-cleared box is up
+  elements.shopRow = fakeElement();
+  game.renderShop();
+  assert.equal(elements.shopRow.children[0].disabled, true);   // bag full
+  game.usePotion();
+  assert.equal(elements.shopRow.children.at(-4).disabled, false);
 });
