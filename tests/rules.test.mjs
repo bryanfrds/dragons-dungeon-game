@@ -7,7 +7,7 @@ import vm from 'node:vm';
 const ctx = {};
 vm.createContext(ctx);
 vm.runInContext(readFileSync(new URL('../rules.js', import.meta.url), 'utf8') +
-  '\nthis.r = { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds };', ctx);
+  '\nthis.r = { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds }; this.spawnableTypes = spawnableTypes;', ctx);
 const { isUpgrade, applyXp, monsterHitDamage, stepSeconds } = ctx.r;
 
 const freshHero = () => ({ level: 1, xp: 0, maxXp: 60, maxHp: 100, maxMp: 50,
@@ -53,4 +53,13 @@ test('hits always do at least 1, and Iron Wall cuts them', () => {
 test('faster heroes take less time per tile', () => {
   assert.ok(stepSeconds(5) < stepSeconds(3.5));
   assert.equal(stepSeconds(0), stepSeconds(0.5));   // never a zero or negative speed
+});
+
+test('new bug types unlock on their floors, and the boss never rolls as a normal bug', () => {
+  const types = [{ type: 'slime', minFloor: 1 }, { type: 'ghost', minFloor: 3 }, { type: 'race', minFloor: 4 },
+                 { type: 'loop', minFloor: 7 }, { type: 'boss' }];
+  const names = (floor) => ctx.spawnableTypes(types, floor).map(t => t.type).join(',');
+  assert.equal(names(1), 'slime');
+  assert.equal(names(4), 'slime,ghost,race');
+  assert.equal(names(9), 'slime,ghost,race,loop');
 });

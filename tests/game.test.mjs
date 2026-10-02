@@ -239,3 +239,28 @@ test('loading a save shows its level on the hero badge', () => {
   assert.ok(game.loadGame());
   assert.equal(elements.heroLevelBadge.textContent, 'LVL 8');
 });
+
+test('an Infinite Loop heals itself while left alone', () => {
+  const game = makeGame();
+  game.autoPlay = false;
+  game.spawnMonster('loop', 9, 9);              // too far away to chase
+  const loop = game.monsters[0];
+  loop.hp = loop.maxHp / 2;
+  run(game, 2);
+  assert.ok(loop.hp > loop.maxHp / 2 + 1, `hp ${loop.hp} of ${loop.maxHp}`);
+  assert.ok(loop.hp <= loop.maxHp);
+});
+
+test('a Race Condition strikes twice as often as other bugs', () => {
+  const hitsIn2s = (type) => {
+    const game = makeGame();
+    game.autoPlay = false;
+    game.hero.hp = game.hero.maxHp = 10000;
+    game.spawnMonster(type, 2, 1);
+    game.monsters[0].attackCooldown = 0;
+    run(game, 2);
+    return game.logs;                            // one log line per hit on the hero
+  };
+  assert.equal(hitsIn2s('slime'), 2);
+  assert.equal(hitsIn2s('race'), 4);
+});
