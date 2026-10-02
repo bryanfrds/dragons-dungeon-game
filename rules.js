@@ -113,8 +113,10 @@ function nextShopBuy(state) {
 
 /** A number from a save, or `fallback` if it isn't one; clamped, optionally whole. */
 function cleanNumber(value, min, max, fallback, whole = true) {
+  // Only numbers and numeric text count: Number([]) and Number('') are 0.
+  if ((typeof value !== 'number' && typeof value !== 'string') || value === '') return fallback;
   let n = Number(value);
-  if (value === null || value === '' || !Number.isFinite(n)) return fallback;
+  if (!Number.isFinite(n)) return fallback;
   if (whole) n = Math.floor(n);
   return Math.min(max, Math.max(min, n));
 }
