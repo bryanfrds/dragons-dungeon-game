@@ -355,7 +355,11 @@ class Game {
     document.getElementById('eqArmorStat').textContent = `+${this.hero.equipment.armor?.def || 0} Def`;
 
     document.getElementById('eqRelicName').textContent = this.hero.equipment.relic?.name || 'Empty';
-    document.getElementById('eqRelicStat').textContent = this.hero.equipment.relic?.lifesteal ? `+${this.hero.equipment.relic.lifesteal}% Lifesteal` : `+${this.hero.equipment.relic?.maxHp || 10} HP`;
+    // Every bonus the ring has. Boots of Hermes used to read "+10 HP" (it's speed).
+    const relic = this.hero.equipment.relic || {};
+    const bonuses = [relic.maxHp && `+${relic.maxHp} HP`, relic.lifesteal && `+${relic.lifesteal}% Lifesteal`,
+                     relic.spd && `+${relic.spd} Spd`].filter(Boolean);
+    document.getElementById('eqRelicStat').textContent = bonuses.join(', ') || 'No bonus';
 
     document.getElementById('potionCount').textContent = this.hero.potions;
   }
