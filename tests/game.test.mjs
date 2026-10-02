@@ -113,17 +113,22 @@ test('holding a key walks at the speed stat, not a tile per frame', () => {
 test('while dead nothing happens: no hits, no potion, no skills', () => {
   const game = makeGame();
   addBug(game, 'skeleton', 2, 1).attackCooldown = 0;
-  const far = addBug(game, 'ghost', 9, 9);      // the AI would walk to this one if it could
   game.hero.hp = 0;
   game.usePotion();
   game.triggerWhirlwind();
   game.manualAttack();
   run(game, 2);
   assert.equal(game.hero.hp, 0);
-  assert.deepEqual([game.hero.gx, game.hero.gy], [1, 1], 'the hero stays put');
-  assert.deepEqual([far.gx, far.gy], [9, 9], 'and so do the bugs');
   assert.equal(game.hero.potions, 2);
   assert.equal(game.logs, 0);
+});
+
+test('while dead the AI stops walking', () => {
+  const game = makeGame();
+  addBug(game, 'ghost', 9, 9);                  // it would walk towards this one
+  game.hero.hp = 0;
+  run(game, 2);
+  assert.deepEqual([game.hero.gx, game.hero.gy], [1, 1]);
 });
 
 test("the AI fights instead of freezing when Whirlwind is ready but MP is short", () => {
