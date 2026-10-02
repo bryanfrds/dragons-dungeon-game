@@ -12,11 +12,11 @@ A retro dungeon crawler that plays itself. A pixel hero works down through proce
 
 ## 🎮 Features
 
-- **It plays itself.** The AI finds the nearest bug with breadth-first search, fights it, drinks a potion below 35% HP, spins a Whirlwind when two or more bugs are next to it, and loots chests before taking the stairs.
+- **It plays itself.** The AI goes for the closest bug, finds a route to it with breadth-first search, fights it, drinks a potion below 35% HP, spins a Whirlwind when two or more bugs are next to it, and loots chests before taking the stairs.
 - **Take over any time.** Tab switches between the AI and the keyboard.
 - **Bugs to fix:** Syntax Error (slime), Memory Leak (ghost), Null Pointer (skeleton), and a Merge Conflict boss on every fifth floor. They get tougher the deeper you go.
-- **Loot** in four rarities: common, rare, epic and legendary. Better swords and armor are equipped automatically, and every new ring is put on.
-- **Levels:** every level-up raises HP, MP, attack and defence and gives a potion.
+- **Loot** in four rarities: common, rare, epic and legendary. Better swords and armor are equipped automatically, and every new relic (ring, fang, boots or stone) is put on.
+- **Levels:** every level-up raises HP, MP, attack and defence and gives a potion (you can carry up to 5).
 - **Saves itself** in your browser every few seconds: floor, gold, level and gear.
 - **8-bit sound** synthesised with the Web Audio API, so there are no audio files.
 - **Speed control** at 1×, 2× or 4×.
@@ -34,7 +34,7 @@ python3 -m http.server 8000
 # then visit http://localhost:8000
 ```
 
-Add `?portrait` to the URL for a tall layout, which fits a narrow side pane.
+Add `?portrait` to the URL to turn the map on its side, which suits a tall, narrow pane.
 
 ---
 
@@ -44,9 +44,9 @@ Add `?portrait` to the URL for a tall layout, which fits a narrow side pane.
 | --- | --- |
 | **Tab** | Switch between the AI and manual play |
 | **WASD / Arrows** | Move |
-| **Space** | Attack |
+| **Space** | Attack (manual play) |
 | **1** | Whirlwind: hits every bug next to you |
-| **2** | Iron Wall: much higher defence for 4 seconds |
+| **2** | Iron Wall: 2.5× defence for 4 seconds |
 | **3** | Health potion: restores half your HP |
 
 ---
