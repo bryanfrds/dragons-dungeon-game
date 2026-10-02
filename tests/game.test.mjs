@@ -40,7 +40,7 @@ function makeGame(W = 12, H = 12) {
       equipment: { weapon: { atk: 4 }, armor: { def: 2 }, relic: { maxHp: 10 } },
     },
     monsters: [], particles: [], floatingTexts: [], keys: {}, autoPlay: true, aiCooldown: 0,
-    floor: 1, gold: 0, logs: 0,
+    floor: 1, bestFloor: 1, gold: 0, logs: 0,
     sound: new Proxy({}, { get: () => () => {} }),
     overlay: { classList: { contains: () => true, add() {}, remove() {} } },
     aiActionText: {}, floorDisplay: {}, zoneName: {},
@@ -263,4 +263,16 @@ test('a Race Condition strikes twice as often as other bugs', () => {
   };
   assert.equal(hitsIn2s('slime'), 2);
   assert.equal(hitsIn2s('race'), 4);
+});
+
+test('the best floor is kept when you die and start over, and saved', () => {
+  const game = makeGame();
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(6);
+  game.restartGame();                           // back to floor 1
+  assert.equal(game.floor, 1);
+  assert.equal(game.bestFloor, 6);
+  assert.equal(elements.bestDisplay.textContent, 6);
+  game.saveGame();
+  assert.equal(JSON.parse(ctx.localStorage.getItem('pixelDungeonSave')).bestFloor, 6);
 });
