@@ -244,8 +244,17 @@ class Game {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
       if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
       this.gold = saved.gold || 0;
-      this.bestFloor = Math.max(saved.floor, Number(saved.bestFloor) || 1);
-      this.shopBought = saved.shopBought && typeof saved.shopBought === 'object' ? saved.shopBought : {};
+      const best = Math.floor(Number(saved.bestFloor));
+      this.bestFloor = Math.max(saved.floor, Number.isFinite(best) ? Math.min(best, 100000) : 1);
+      // Only known items, as whole counts from 0 to 1000. A count like -1e308
+      // priced an upgrade at 0g and froze autoplay buying it forever; "abc"
+      // made the price NaN, which every purchase passed for free.
+      const sb = saved.shopBought && typeof saved.shopBought === 'object' ? saved.shopBought : {};
+      this.shopBought = {};
+      for (const { id } of SHOP_ITEMS) {
+        const n = Math.floor(Number(sb[id]));
+        if (Number.isFinite(n) && n > 0) this.shopBought[id] = Math.min(n, 1000);
+      }
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }

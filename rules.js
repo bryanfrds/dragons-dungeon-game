@@ -83,7 +83,7 @@ function buyFromShop(state, id) {
   if (!item) return false;
   const bought = state.bought[id] || 0;
   const cost = shopPrice(item, bought);
-  if (state.gold < cost) return false;
+  if (!(cost > 0) || state.gold < cost) return false;   // never free, never NaN
   const hero = state.hero;
   if (id === 'potion') {
     if (hero.potions >= MAX_POTIONS) return false;
