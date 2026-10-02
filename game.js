@@ -454,7 +454,7 @@ class Game {
     this.hero.skills.shield.cd = this.hero.skills.shield.maxCd;
     this.hero.shieldActiveTimer = 4.0;
     this.sound.playShield();
-    this.log('Hero activated Iron Wall! +100% Defense for 4s.', 'heal');
+    this.log('Hero activated Iron Wall! 2.5x Defense for 4s.', 'heal');
     this.updateBars();
   }
 
@@ -808,10 +808,7 @@ class Game {
       if (dist <= 1.2 && m.attackCooldown <= 0) {
         // Monster attacks hero
         m.attackCooldown = 1.0;
-        let def = this.totalDefense;
-        if (this.hero.shieldActiveTimer > 0) def *= 2.5;
-
-        const monsterDmg = Math.max(1, m.atk - Math.floor(def * 0.5));
+        const monsterDmg = monsterHitDamage(m.atk, this.totalDefense, this.hero.shieldActiveTimer > 0);
         this.hero.hp -= monsterDmg;
         this.sound.playHit();
         this.addFloatingText(`-${monsterDmg}`, this.hero.x + 16, this.hero.y, '#f87171');
