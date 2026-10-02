@@ -537,6 +537,13 @@ class Game {
 
   killMonster(m) {
     this.sound.playKill();
+    // Burst into pixels so a kill reads at a glance, bigger for the boss.
+    const n = m.type === 'boss' ? 40 : 16;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, v = 1.5 + Math.random() * 2.5;
+      this.particles.push({ x: m.x + 16, y: m.y + 16, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+                            color: i % 3 ? m.color : '#ffffff', life: 0.45, maxLife: 0.45, size: 3 });
+    }
     this.gold += m.gold;
     this.gainXp(m.xp);
     this.log(`Fixed bug: [${m.name}]! Gained +${m.gold} Gold, +${m.xp} XP.`, 'kill');
