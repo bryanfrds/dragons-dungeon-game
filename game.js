@@ -87,6 +87,7 @@ class Game {
       isAttacking: false,
       attackCooldown: 0,
       moveCooldown: 0,
+      hurtTimer: 0,
       shieldActiveTimer: 0,
       skills: {
         whirlwind: { cd: 0, maxCd: 6 },
@@ -108,6 +109,8 @@ class Game {
     this.aiPath = [];
     this.aiCurrentTarget = null;
     this.aiCooldown = 0;
+    this.shake = 0;        // seconds of screen shake left (after the hero is hit)
+    this.fade = 0;         // seconds of fade-in left after entering a floor
 
     this.initUI();
     this.initControls();
@@ -250,6 +253,7 @@ class Game {
     this.floorDisplay.textContent = this.floor;
     this.isFloorCleared = false;
     this.dungeon = this.dungeonGen.generate(this.floor);
+    this.fade = 0.45;
     this.floorLayer = buildFloorLayer(this.dungeon.grid, TILE_SIZE, this.floor * 7919 + Math.floor(Math.random() * 1000));
 
     // Position Hero at Spawn Room
@@ -498,6 +502,7 @@ class Game {
   damageMonster(m, rawDmg) {
     const dmg = Math.max(1, rawDmg + Math.floor(Math.random() * 4) - 2);
     m.hp -= dmg;
+    m.hitTimer = 0.12;
     this.sound.playHit();
     this.addFloatingText(`-${dmg}`, m.x + 16, m.y, '#f87171');
 
@@ -798,6 +803,8 @@ class Game {
     // The swing pose lasts as long as the swing; it used to stay on forever.
     if (this.hero.attackCooldown <= 0.2) this.hero.isAttacking = false;
     if (this.hero.moveCooldown > 0) this.hero.moveCooldown -= dt;
+    if (this.hero.hurtTimer > 0) this.hero.hurtTimer -= dt;
+    this.monsters.forEach(m => { if (m.hitTimer > 0) m.hitTimer -= dt; });
     if (this.hero.skills.whirlwind.cd > 0) this.hero.skills.whirlwind.cd -= dt;
     if (this.hero.skills.shield.cd > 0) this.hero.skills.shield.cd -= dt;
     if (this.hero.shieldActiveTimer > 0) this.hero.shieldActiveTimer -= dt;
@@ -840,6 +847,8 @@ class Game {
         m.attackCooldown = 1.0;
         const monsterDmg = monsterHitDamage(m.atk, this.totalDefense, this.hero.shieldActiveTimer > 0);
         this.hero.hp -= monsterDmg;
+        this.hero.hurtTimer = 0.18;
+        this.shake = Math.max(this.shake, 0.15);
         this.sound.playHit();
         this.addFloatingText(`-${monsterDmg}`, this.hero.x + 16, this.hero.y, '#f87171');
         this.log(`[${m.name}] attacked Hero for ${monsterDmg} damage!`, 'damage');
@@ -860,6 +869,8 @@ class Game {
 
   /** Particles and floating numbers, which keep fading even after death. */
   updateEffects(dt) {
+    this.shake = Math.max(0, this.shake - dt);
+    this.fade = Math.max(0, this.fade - dt);
     this.particles = this.particles.filter(p => {
       p.x += p.vx;
       p.y += p.vy;
@@ -900,6 +911,12 @@ class Game {
 
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    // A short shake when the hero takes a hit, fading out as it runs down.
+    this.ctx.save();
+    if (this.shake > 0) {
+      const m = 4 * (this.shake / 0.15);
+      this.ctx.translate(Math.round((Math.random() - 0.5) * m), Math.round((Math.random() - 0.5) * m));
+    }
 
     // 1. Walls and floor, drawn once per floor by tiles.js (see startFloor).
     this.ctx.drawImage(this.floorLayer, 0, 0);
@@ -933,7 +950,9 @@ class Game {
     this.monsters.forEach(m => {
       const frame = Math.floor(m.animTimer) % 2;
       const sprite = this.sprites.getEnemySprite(m.type, frame);
+      if (m.hitTimer > 0) this.ctx.filter = 'brightness(2.6)';   // flash white when hit
       this.ctx.drawImage(sprite, m.x, m.y);
+      this.ctx.filter = 'none';
 
       // HP Bar above monster
       const hpPct = m.hp / m.maxHp;
@@ -946,7 +965,10 @@ class Game {
     // 5. Draw Hero
     const heroFrame = (Math.abs(this.hero.targetX - this.hero.x) > 1 || Math.abs(this.hero.targetY - this.hero.y) > 1) ? 1 : 0;
     const heroSprite = this.sprites.getHeroSprite(heroFrame, this.hero.facing, this.hero.isAttacking);
+    // Flash red for a moment when hit.
+    if (this.hero.hurtTimer > 0) this.ctx.filter = 'sepia(1) saturate(6) hue-rotate(-40deg) brightness(1.1)';
     this.ctx.drawImage(heroSprite, this.hero.x, this.hero.y);
+    this.ctx.filter = 'none';
 
     // Shield Aura if active
     if (this.hero.shieldActiveTimer > 0) {
@@ -963,12 +985,33 @@ class Game {
       this.ctx.fillRect(p.x, p.y, p.size, p.size);
     });
 
-    // 7. Draw Floating Damage Numbers
+    // 7. Light: the hero carries a lamp, so the edges of the map fall into
+    // shadow. Drawn before the numbers so those stay readable everywhere.
+    const hx = this.hero.x + 16, hy = this.hero.y + 16;
+    const light = this.ctx.createRadialGradient(hx, hy, TILE_SIZE * 2.5, hx, hy, TILE_SIZE * 9);
+    light.addColorStop(0, 'rgba(4, 6, 12, 0)');
+    light.addColorStop(1, 'rgba(4, 6, 12, 0.45)');
+    this.ctx.fillStyle = light;
+    this.ctx.fillRect(-8, -8, this.canvas.width + 16, this.canvas.height + 16);
+
+    // 8. Floating damage numbers, outlined so they read on any background.
     this.ctx.font = '10px "Press Start 2P"';
+    this.ctx.lineWidth = 3;
+    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
     this.floatingTexts.forEach(t => {
+      this.ctx.globalAlpha = Math.min(1, t.life / t.maxLife * 2);
+      this.ctx.strokeText(t.text, t.x, t.y);
       this.ctx.fillStyle = t.color;
       this.ctx.fillText(t.text, t.x, t.y);
     });
+    this.ctx.globalAlpha = 1;
+    this.ctx.restore();
+
+    // 9. A new floor fades in from black.
+    if (this.fade > 0) {
+      this.ctx.fillStyle = `rgba(0, 0, 0, ${this.fade / 0.45})`;
+      this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
   }
 }
 
