@@ -242,8 +242,13 @@ class Game {
   loadGame() {
     try {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (!saved || !saved.hero || !(saved.floor >= 1)) return null;
-      this.gold = saved.gold || 0;
+      // Whole numbers in a sane range: a string gold ("abc") made every shop
+      // price compare false, so everything was free; 1e400 floors showed Infinity.
+      const floor = Math.floor(Number(saved && saved.floor));
+      if (!saved || !saved.hero || !(floor >= 1 && floor <= 100000)) return null;
+      saved.floor = floor;
+      const gold = Math.floor(Number(saved.gold));
+      this.gold = Number.isFinite(gold) && gold > 0 ? gold : 0;
       const best = Math.floor(Number(saved.bestFloor));
       this.bestFloor = Math.max(saved.floor, Number.isFinite(best) ? Math.min(best, 100000) : 1);
       // Only known items, as whole counts from 0 to 1000. A count like -1e308
