@@ -84,6 +84,7 @@ class Game {
       potions: 2,
       isAttacking: false,
       attackCooldown: 0,
+      moveCooldown: 0,
       shieldActiveTimer: 0,
       skills: {
         whirlwind: { cd: 0, maxCd: 6 },
@@ -680,8 +681,15 @@ class Game {
     }
   }
 
+  /**
+   * Step one tile, at most once per stepSeconds(speed). Movement used to have no
+   * limit: holding a key moved a tile every frame (60 a second), the AI moved on
+   * every 0.15s tick, and the speed stat - Boots of Hermes included - did nothing.
+   */
   moveHeroTo(gx, gy) {
+    if (this.hero.moveCooldown > 0) return;
     if (this.dungeonGen.isWalkable(gx, gy)) {
+      this.hero.moveCooldown = stepSeconds(this.totalSpeed);
       this.hero.facing = gx >= this.hero.gx ? 1 : -1;
       this.hero.gx = gx;
       this.hero.gy = gy;
@@ -732,6 +740,7 @@ class Game {
 
     // Cooldown timers
     if (this.hero.attackCooldown > 0) this.hero.attackCooldown -= dt;
+    if (this.hero.moveCooldown > 0) this.hero.moveCooldown -= dt;
     if (this.hero.skills.whirlwind.cd > 0) this.hero.skills.whirlwind.cd -= dt;
     if (this.hero.skills.shield.cd > 0) this.hero.skills.shield.cd -= dt;
     if (this.hero.shieldActiveTimer > 0) this.hero.shieldActiveTimer -= dt;
