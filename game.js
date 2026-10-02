@@ -232,7 +232,7 @@ class Game {
       for (const k of SAVED_HERO_FIELDS) {
         if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
       }
-      if (this.hero.hp <= 0) this.hero.hp = this.hero.maxHp;
+      if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
       this.log(`Save loaded: Floor ${saved.floor}, Level ${this.hero.level}.`, 'system');
       return saved;
     } catch (e) {
@@ -330,6 +330,11 @@ class Game {
 
   get totalSpeed() {
     return this.hero.baseSpd + (this.hero.equipment.relic?.spd || 0);
+  }
+
+  /** Max HP including the ring's bonus. hero.maxHp is the base that levels raise. */
+  get maxHp() {
+    return this.hero.maxHp + (this.hero.equipment.relic?.maxHp || 0);
   }
 
   get totalLifesteal() {
@@ -438,10 +443,10 @@ class Game {
   }
 
   usePotion() {
-    if (this.hero.potions <= 0 || this.hero.hp >= this.hero.maxHp) return;
+    if (this.hero.potions <= 0 || this.hero.hp >= this.maxHp) return;
     this.hero.potions--;
-    const healAmt = Math.floor(this.hero.maxHp * 0.5);
-    this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + healAmt);
+    const healAmt = Math.floor(this.maxHp * 0.5);
+    this.hero.hp = Math.min(this.maxHp, this.hero.hp + healAmt);
     this.sound.playPotion();
     this.addFloatingText(`+${healAmt} HP`, this.hero.x + 16, this.hero.y, '#34d399');
     this.log(`Used Health Potion! Restored ${healAmt} HP.`, 'heal');
@@ -475,7 +480,7 @@ class Game {
     // Lifesteal heal
     if (this.totalLifesteal > 0) {
       const heal = Math.max(1, Math.floor(dmg * (this.totalLifesteal / 100)));
-      this.hero.hp = Math.min(this.hero.maxHp, this.hero.hp + heal);
+      this.hero.hp = Math.min(this.maxHp, this.hero.hp + heal);
       this.addFloatingText(`+${heal}`, this.hero.x + 16, this.hero.y, '#34d399');
     }
 
@@ -529,6 +534,7 @@ class Game {
     // they were, so a legendary Infinity Stone could be lost to a Silver Ring.
     if (isUpgrade(this.hero.equipment, drop)) {
       this.hero.equipment[drop.slot] = drop;
+      this.hero.hp = Math.min(this.hero.hp, this.maxHp);   // a ring with less HP lowers the cap
       this.log(`✨ Equipped new gear: ${drop.name} (${drop.rarity.toUpperCase()})!`, 'loot');
       this.updateStatsUI();
     }
@@ -541,7 +547,7 @@ class Game {
       this.hero.level++;
       this.hero.maxXp = Math.floor(this.hero.maxXp * 1.4);
       this.hero.maxHp += 20;
-      this.hero.hp = this.hero.maxHp;
+      this.hero.hp = this.maxHp;
       this.hero.maxMp += 10;
       this.hero.mp = this.hero.maxMp;
       this.hero.baseAtk += 3;
@@ -559,12 +565,12 @@ class Game {
   }
 
   updateBars() {
-    const hpPct = Math.max(0, (this.hero.hp / this.hero.maxHp) * 100);
+    const hpPct = Math.max(0, (this.hero.hp / this.maxHp) * 100);
     const mpPct = Math.max(0, (this.hero.mp / this.hero.maxMp) * 100);
     const xpPct = Math.max(0, (this.hero.xp / this.hero.maxXp) * 100);
 
     this.hpBar.style.width = `${hpPct}%`;
-    this.hpText.textContent = `${this.hero.hp} / ${this.hero.maxHp} HP`;
+    this.hpText.textContent = `${this.hero.hp} / ${this.maxHp} HP`;
 
     this.mpBar.style.width = `${mpPct}%`;
     this.mpText.textContent = `${this.hero.mp} / ${this.hero.maxMp} MP`;
@@ -606,7 +612,7 @@ class Game {
     this.aiCooldown = 0.15; // AI tick rate
 
     // 1. Check if low HP -> drink potion
-    if (this.hero.hp < this.hero.maxHp * 0.35 && this.hero.potions > 0) {
+    if (this.hero.hp < this.maxHp * 0.35 && this.hero.potions > 0) {
       this.usePotion();
     }
 
@@ -701,7 +707,7 @@ class Game {
   }
 
   restartGame() {
-    this.hero.hp = this.hero.maxHp;
+    this.hero.hp = this.maxHp;
     this.hero.mp = this.hero.maxMp;
     this.hero.potions = 2;
     this.startFloor(1);
