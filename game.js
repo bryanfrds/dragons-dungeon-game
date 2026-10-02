@@ -413,6 +413,7 @@ class Game {
 
   // Abilities
   triggerWhirlwind() {
+    if (this.hero.hp <= 0) return;   // see update(): nothing happens while dead
     if (this.hero.mp < 15 || this.hero.skills.whirlwind.cd > 0) return;
     this.hero.mp -= 15;
     this.hero.skills.whirlwind.cd = this.hero.skills.whirlwind.maxCd;
@@ -449,6 +450,7 @@ class Game {
   }
 
   triggerShield() {
+    if (this.hero.hp <= 0) return;
     if (this.hero.mp < 20 || this.hero.skills.shield.cd > 0) return;
     this.hero.mp -= 20;
     this.hero.skills.shield.cd = this.hero.skills.shield.maxCd;
@@ -459,6 +461,9 @@ class Game {
   }
 
   usePotion() {
+    // A potion at 0 HP used to bring the hero back while the game-over box was
+    // up, and its button then skipped to the next floor instead of respawning.
+    if (this.hero.hp <= 0) return;
     if (this.hero.potions <= 0 || this.hero.hp >= this.maxHp) return;
     this.hero.potions--;
     const healAmt = Math.floor(this.maxHp * 0.5);
@@ -471,7 +476,7 @@ class Game {
   }
 
   manualAttack() {
-    if (this.hero.attackCooldown > 0) return;
+    if (this.hero.hp <= 0 || this.hero.attackCooldown > 0) return;
     this.hero.attackCooldown = 0.35;
     this.hero.isAttacking = true;
     this.sound.playSwing();
