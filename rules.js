@@ -50,6 +50,14 @@ function stepSeconds(speed) {
   return 1 / Math.max(0.5, speed);
 }
 
+/**
+ * The bug types that can appear on a floor: every normal type whose minFloor
+ * has been reached. The boss isn't in the pool; it has its own floors.
+ */
+function spawnableTypes(types, floor) {
+  return types.filter(t => t.type !== 'boss' && (t.minFloor || 1) <= floor);
+}
+
 if (typeof window !== 'undefined') {
-  Object.assign(window, { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds });
+  Object.assign(window, { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds, spawnableTypes });
 }
