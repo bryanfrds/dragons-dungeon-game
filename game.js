@@ -242,30 +242,29 @@ class Game {
   loadGame() {
     try {
       const saved = JSON.parse(localStorage.getItem(SAVE_KEY));
-      // Whole numbers in a sane range: a string gold ("abc") made every shop
-      // price compare false, so everything was free; 1e400 floors showed Infinity.
-      const floor = Math.floor(Number(saved && saved.floor));
-      if (!saved || !saved.hero || !(floor >= 1 && floor <= 100000)) return null;
+      // Everything in a save is cleaned before use (see rules.js), because a
+      // hand-edited save could otherwise make the shop free ("abc" gold), show
+      // Infinity (1e400), or freeze autoplay (-1e308 potions or bought-counts).
+      const floor = cleanNumber(saved && saved.floor, 1, 100000, NaN);
+      if (!saved || !saved.hero || typeof saved.hero !== 'object' || !(floor >= 1)) return null;
       saved.floor = floor;
-      const gold = Math.floor(Number(saved.gold));
-      this.gold = Number.isFinite(gold) && gold > 0 ? gold : 0;
-      const best = Math.floor(Number(saved.bestFloor));
-      this.bestFloor = Math.max(saved.floor, Number.isFinite(best) ? Math.min(best, 100000) : 1);
-      // Only known items, as whole counts from 0 to 1000. A count like -1e308
-      // priced an upgrade at 0g and froze autoplay buying it forever; "abc"
-      // made the price NaN, which every purchase passed for free.
+      this.gold = cleanNumber(saved.gold, 0, 1e9, 0);
+      this.bestFloor = Math.max(floor, cleanNumber(saved.bestFloor, 1, 100000, 1));
       const sb = saved.shopBought && typeof saved.shopBought === 'object' ? saved.shopBought : {};
       this.shopBought = {};
       for (const { id } of SHOP_ITEMS) {
-        const n = Math.floor(Number(sb[id]));
-        if (Number.isFinite(n) && n > 0) this.shopBought[id] = Math.min(n, 1000);
+        const n = cleanNumber(sb[id], 0, 1000, 0);
+        if (n > 0) this.shopBought[id] = n;
       }
-      for (const k of SAVED_HERO_FIELDS) {
-        if (saved.hero[k] !== undefined) this.hero[k] = saved.hero[k];
+      loadHeroNumbers(this.hero, saved.hero);
+      const gear = saved.hero.equipment && typeof saved.hero.equipment === 'object' ? saved.hero.equipment : {};
+      for (const slot of ['weapon', 'armor', 'relic']) {
+        const item = cleanGear(gear[slot], slot);
+        if (item) this.hero.equipment[slot] = item;
       }
-      // A broken save with maxXp of 0 or less would make applyXp loop forever.
-      if (!(this.hero.maxXp >= 1)) this.hero.maxXp = 60;
       if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
+      this.hero.hp = Math.min(this.hero.hp, this.maxHp);
+      this.hero.mp = Math.min(this.hero.mp, this.hero.maxMp);
       // The badge is static HTML that only level-ups updated, so a loaded
       // level-8 hero still showed "LVL 1".
       document.getElementById('heroLevelBadge').textContent = `LVL ${this.hero.level}`;
@@ -839,7 +838,8 @@ class Game {
 
     if (this.autoPlay) {
       // The AI shops too: potions up to 3, then the cheapest upgrade, while it can pay.
-      for (let id; (id = nextShopBuy({ gold: this.gold, bought: this.shopBought, hero: this.hero })); ) {
+      // At most 50 buys a floor, so no save, however strange, can keep it here.
+      for (let n = 0, id; n < 50 && (id = nextShopBuy({ gold: this.gold, bought: this.shopBought, hero: this.hero })); n++) {
         if (!this.buy(id)) break;
       }
       setTimeout(() => {
