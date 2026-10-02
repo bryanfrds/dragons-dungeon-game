@@ -58,6 +58,59 @@ function spawnableTypes(types, floor) {
   return types.filter(t => t.type !== 'boss' && (t.minFloor || 1) <= floor);
 }
 
+// The shop between floors. Upgrades get dearer each time you buy one, so gold
+// keeps mattering; potions keep one price.
+const SHOP_ITEMS = [
+  { id: 'potion', name: 'Health Potion', icon: '🧪', price: 30, growth: 1 },
+  { id: 'atk', name: 'Whetstone', desc: '+3 Atk', icon: '🗡️', price: 60, growth: 1.35 },
+  { id: 'def', name: 'Armor Plating', desc: '+2 Def', icon: '🛡️', price: 60, growth: 1.35 },
+  { id: 'hp', name: 'Vitality Rune', desc: '+20 Max HP', icon: '❤️', price: 80, growth: 1.35 },
+];
+const MAX_POTIONS = 5;
+
+/** What an item costs now, given how many of it were bought before. */
+function shopPrice(item, timesBought) {
+  return Math.round(item.price * Math.pow(item.growth, timesBought || 0));
+}
+
+/**
+ * Buy one of `id`. `state` holds gold, the hero and a bought-count per item.
+ * Returns false, changing nothing, if it's unknown, unaffordable, or a potion
+ * when the bag is full.
+ */
+function buyFromShop(state, id) {
+  const item = SHOP_ITEMS.find(i => i.id === id);
+  if (!item) return false;
+  const bought = state.bought[id] || 0;
+  const cost = shopPrice(item, bought);
+  if (state.gold < cost) return false;
+  const hero = state.hero;
+  if (id === 'potion') {
+    if (hero.potions >= MAX_POTIONS) return false;
+    hero.potions++;
+  } else if (id === 'atk') hero.baseAtk += 3;
+  else if (id === 'def') hero.baseDef += 2;
+  else if (id === 'hp') { hero.maxHp += 20; hero.hp += 20; }
+  state.gold -= cost;
+  state.bought[id] = bought + 1;
+  return true;
+}
+
+/**
+ * What the AI buys next, or null: potions up to 3 first, since running dry is
+ * what kills it, then the cheapest upgrade it can afford.
+ */
+function nextShopBuy(state) {
+  const potion = SHOP_ITEMS[0];
+  if (state.hero.potions < 3 && state.gold >= shopPrice(potion, state.bought.potion)) return 'potion';
+  const upgrades = SHOP_ITEMS.slice(1)
+    .map(i => ({ id: i.id, cost: shopPrice(i, state.bought[i.id]) }))
+    .filter(u => u.cost <= state.gold)
+    .sort((a, b) => a.cost - b.cost);
+  return upgrades.length ? upgrades[0].id : null;
+}
+
 if (typeof window !== 'undefined') {
-  Object.assign(window, { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds, spawnableTypes });
+  Object.assign(window, { relicScore, isUpgrade, applyXp, monsterHitDamage, stepSeconds, spawnableTypes,
+                         SHOP_ITEMS, MAX_POTIONS, shopPrice, buyFromShop, nextShopBuy });
 }
