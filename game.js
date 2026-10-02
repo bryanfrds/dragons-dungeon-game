@@ -1,10 +1,11 @@
 // Pixel Dungeon Crawler - Main Game Loop & State Manager
 
 const MONSTER_TYPES = [
-  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399' },
-  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8' },
-  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171' },
-  { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24' }
+  // spd: tiles per second when chasing the hero. Ghosts are quick, slimes ooze.
+  { type: 'slime', name: 'Syntax Error', baseHp: 30, baseAtk: 6, xp: 25, gold: 8, color: '#34d399', spd: 1.2 },
+  { type: 'ghost', name: 'Memory Leak', baseHp: 45, baseAtk: 9, xp: 40, gold: 15, color: '#38bdf8', spd: 2.2 },
+  { type: 'skeleton', name: 'Null Pointer', baseHp: 65, baseAtk: 14, xp: 60, gold: 22, color: '#f87171', spd: 1.6 },
+  { type: 'boss', name: 'MERGE CONFLICT (BOSS)', baseHp: 200, baseAtk: 22, xp: 200, gold: 80, color: '#fbbf24', spd: 1.0 }
 ];
 
 const LOOT_TABLE = [
@@ -26,6 +27,7 @@ const LOOT_TABLE = [
 ];
 
 const SAVE_KEY = 'pixelDungeonSave';
+const CHASE_RANGE = 5;   // tiles: how close the hero has to be before a bug gives chase
 const SAVED_HERO_FIELDS = ['level', 'xp', 'maxXp', 'hp', 'maxHp', 'mp', 'maxMp',
   'baseAtk', 'baseDef', 'baseSpd', 'lifesteal', 'potions', 'equipment'];
 
@@ -318,6 +320,8 @@ class Game {
       gold: Math.floor(template.gold * scale),
       facing: -1,
       attackCooldown: 0,
+      spd: template.spd,
+      moveCooldown: Math.random(),   // so a room of bugs doesn't move in lockstep
       animTimer: Math.random() * 10
     });
   }
@@ -701,6 +705,23 @@ class Game {
     }
   }
 
+  /**
+   * Bugs used to stand still until the hero walked up to them. Now one that's
+   * within CHASE_RANGE tiles walks towards the hero at its own speed, without
+   * stepping onto the hero or another bug, and stops once it's next to them.
+   */
+  chaseHero(m, dist, dt) {
+    m.moveCooldown -= dt;
+    if (dist > CHASE_RANGE || dist <= 1.2 || m.moveCooldown > 0) return;
+    const path = this.dungeonGen.findPath({ x: m.gx, y: m.gy }, { x: this.hero.gx, y: this.hero.gy });
+    const next = path[0];
+    if (!next || (next.x === this.hero.gx && next.y === this.hero.gy) || this.monsterAt(next.x, next.y)) return;
+    m.facing = next.x >= m.gx ? 1 : -1;
+    m.gx = next.x;
+    m.gy = next.y;
+    m.moveCooldown = stepSeconds(m.spd);
+  }
+
   monsterAt(gx, gy) {
     return this.monsters.find(m => m.gx === gx && m.gy === gy);
   }
@@ -780,6 +801,10 @@ class Game {
 
       // Distance to hero
       const dist = Math.hypot(this.hero.gx - m.gx, this.hero.gy - m.gy);
+      this.chaseHero(m, dist, dt);
+      // Glide to the tile it's on, the same way the hero does.
+      m.x += (m.gx * TILE_SIZE - m.x) * Math.min(1, 10 * dt);
+      m.y += (m.gy * TILE_SIZE - m.y) * Math.min(1, 10 * dt);
       if (dist <= 1.2 && m.attackCooldown <= 0) {
         // Monster attacks hero
         m.attackCooldown = 1.0;
