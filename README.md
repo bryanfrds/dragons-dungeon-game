@@ -8,6 +8,8 @@ A retro dungeon crawler that plays itself. A pixel hero works down through proce
 
 **[▶ Play it in your browser](https://bryanfrds.github.io/dragons-dungeon-game/)**
 
+![The AI fixing bugs, looting a chest and taking the stairs down](docs/gameplay.gif)
+
 ---
 
 ## 🎮 Features
@@ -60,4 +62,13 @@ game.js      game loop, combat, loot, saving, and the auto-play AI
 dungeon.js   floor generation and path-finding
 sprites.js   pixel-art sprites, drawn in code
 audio.js     sound effects, synthesised with the Web Audio API
+rules.js     levelling, gear, damage and speed rules, kept apart so they can be tested
+tiles.js     draws each floor's brick walls and stone once
+tests/       Node tests: floor generation, the rules, and game behaviour
+```
+
+Run the tests with Node, no install needed:
+
+```bash
+node --test tests/*.test.mjs
 ```
