@@ -250,6 +250,7 @@ class Game {
     this.floorDisplay.textContent = this.floor;
     this.isFloorCleared = false;
     this.dungeon = this.dungeonGen.generate(this.floor);
+    this.floorLayer = buildFloorLayer(this.dungeon.grid, TILE_SIZE, this.floor * 7919 + Math.floor(Math.random() * 1000));
 
     // Position Hero at Spawn Room
     this.hero.gx = this.dungeon.spawnPos.x;
@@ -871,41 +872,36 @@ class Game {
     });
   }
 
+  /**
+   * The way down: a dark pit with a ring of blue light that pulses, and brighter
+   * once the floor is clear and the stairs work.
+   */
+  drawStairs() {
+    const { x, y } = this.dungeon.stairsPos;
+    const cx = x * TILE_SIZE + 16, cy = y * TILE_SIZE + 16;
+    const ready = this.monsters.length === 0;
+    const pulse = 0.5 + 0.5 * Math.sin(Date.now() * (ready ? 0.008 : 0.003));
+    const glow = this.ctx.createRadialGradient(cx, cy, 2, cx, cy, ready ? 26 : 18);
+    glow.addColorStop(0, `rgba(56, 189, 248, ${ready ? 0.55 + pulse * 0.3 : 0.25 + pulse * 0.15})`);
+    glow.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    this.ctx.fillStyle = glow;
+    this.ctx.fillRect(cx - 28, cy - 28, 56, 56);
+    // Steps going down, darker the deeper they go.
+    ['#1e3a5f', '#16304f', '#10243d', '#0a182b'].forEach((c, i) => {
+      this.ctx.fillStyle = c;
+      this.ctx.fillRect(x * TILE_SIZE + 5 + i * 2, y * TILE_SIZE + 6 + i * 5, 22 - i * 4, 5);
+    });
+    this.ctx.strokeStyle = ready ? '#7dd3fc' : '#38bdf8';
+    this.ctx.lineWidth = 2;
+    this.ctx.strokeRect(x * TILE_SIZE + 4, y * TILE_SIZE + 4, 24, 24);
+  }
+
   render() {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-    // 1. Draw Dungeon Floor & Walls
-    // The floor object has no rows/cols, so looping on those drew nothing at
-    // all: every floor and wall tile was missing and the map was solid black.
-    for (let r = 0; r < this.dungeon.grid.length; r++) {
-      for (let c = 0; c < this.dungeon.grid[r].length; c++) {
-        const tile = this.dungeon.grid[r][c];
-        const px = c * TILE_SIZE;
-        const py = r * TILE_SIZE;
-
-        if (tile === TILE.WALL) {
-          this.ctx.fillStyle = '#11151f';
-          this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          this.ctx.strokeStyle = '#1b2230';
-          this.ctx.strokeRect(px + 1, py + 1, TILE_SIZE - 2, TILE_SIZE - 2);
-        } else {
-          // Floor Tile
-          this.ctx.fillStyle = '#171c26';
-          this.ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
-          this.ctx.fillStyle = '#1e2430';
-          this.ctx.fillRect(px + 4, py + 4, 2, 2);
-
-          if (tile === TILE.STAIRS) {
-            // Glowing Portal / Stairs
-            this.ctx.fillStyle = '#38bdf8';
-            this.ctx.fillRect(px + 4, py + 4, 24, 24);
-            this.ctx.fillStyle = '#0f172a';
-            this.ctx.font = '10px "Press Start 2P"';
-            this.ctx.fillText('▼', px + 10, py + 20);
-          }
-        }
-      }
-    }
+    // 1. Walls and floor, drawn once per floor by tiles.js (see startFloor).
+    this.ctx.drawImage(this.floorLayer, 0, 0);
+    this.drawStairs();
 
     // 2. Draw Torches
     this.dungeon.torches.forEach(torch => {
