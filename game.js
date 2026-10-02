@@ -525,20 +525,10 @@ class Game {
     this.addLootDrop(drop);
     this.sound.playCoin();
 
-    // Auto-Equip if superior
-    let equipped = false;
-    if (drop.slot === 'weapon' && (!this.hero.equipment.weapon || drop.atk > this.hero.equipment.weapon.atk)) {
-      this.hero.equipment.weapon = drop;
-      equipped = true;
-    } else if (drop.slot === 'armor' && (!this.hero.equipment.armor || drop.def > this.hero.equipment.armor.def)) {
-      this.hero.equipment.armor = drop;
-      equipped = true;
-    } else if (drop.slot === 'relic') {
-      this.hero.equipment.relic = drop;
-      equipped = true;
-    }
-
-    if (equipped) {
+    // Equip only if it beats what's worn. Rings used to be swapped in whatever
+    // they were, so a legendary Infinity Stone could be lost to a Silver Ring.
+    if (isUpgrade(this.hero.equipment, drop)) {
+      this.hero.equipment[drop.slot] = drop;
       this.log(`✨ Equipped new gear: ${drop.name} (${drop.rarity.toUpperCase()})!`, 'loot');
       this.updateStatsUI();
     }
