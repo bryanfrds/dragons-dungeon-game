@@ -42,10 +42,18 @@ test('each shortcut does its one thing', () => {
                          'usePotion', 'manualAttack']);
 });
 
-test('Tab and Space don\'t also move focus or scroll the page', () => {
+test('Tab and Space don\'t also move focus or scroll the page, even held down', () => {
   const { press } = gameWithKeys();
   assert.equal(press('Tab'), true);
+  assert.equal(press('Tab', { repeat: true }), true);
   assert.equal(press('Space'), true);
+  assert.equal(press('Space', { repeat: true }), true);
+});
+
+test('⌘Tab and Ctrl+Space are still the browser\'s', () => {
+  const { press } = gameWithKeys();
+  assert.equal(press('Tab', { metaKey: true }), false);
+  assert.equal(press('Space', { ctrlKey: true }), false);
 });
 
 test('browser shortcuts like ⌘1 and Ctrl+M are left to the browser', () => {
