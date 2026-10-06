@@ -32,7 +32,8 @@ function gameWithKeys() {
     return prevented;
   };
   const release = (code) => listeners.keyup({ code });
-  return { game, did, press, release };
+  const blur = () => listeners.blur();
+  return { game, did, press, release, blur };
 }
 
 test('each shortcut does its one thing', () => {
@@ -83,4 +84,15 @@ test('movement keys are tracked while held and released on key up', () => {
   assert.equal(game.keys.KeyW, true);
   release('KeyW');
   assert.equal(game.keys.KeyW, false);
+});
+
+test('leaving the window lets go of held keys', () => {
+  const { game, press, blur } = gameWithKeys();
+  press('KeyW');
+  press('ArrowLeft');
+  blur();
+  assert.equal(game.keys.KeyW, undefined);
+  assert.equal(game.keys.ArrowLeft, undefined);
+  press('KeyD');                                   // and keys work again after coming back
+  assert.equal(game.keys.KeyD, true);
 });
