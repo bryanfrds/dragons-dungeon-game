@@ -1,8 +1,17 @@
 // 8-Bit Web Audio API Sound Generator (Zero External Assets Required)
+const MUTE_KEY = 'dungeonMuted';
+
 class SoundFX {
-  constructor() {
+  // `storage` remembers the mute choice between visits; any blocked or missing
+  // storage just means sound starts on.
+  constructor(storage) {
     this.ctx = null;
-    this.enabled = true;
+    this.storage = storage;
+    try {
+      this.enabled = storage?.getItem(MUTE_KEY) !== '1';
+    } catch {
+      this.enabled = true;
+    }
   }
 
   init() {
@@ -17,6 +26,11 @@ class SoundFX {
 
   toggle() {
     this.enabled = !this.enabled;
+    try {
+      this.storage?.setItem(MUTE_KEY, this.enabled ? '0' : '1');
+    } catch {
+      // Private mode or blocked storage: the choice lasts until the page closes.
+    }
     return this.enabled;
   }
 
@@ -197,4 +211,6 @@ class SoundFX {
   }
 }
 
-window.soundEngine = new SoundFX();
+let savedChoices = null;
+try { savedChoices = window.localStorage; } catch { /* blocked: sound starts on */ }
+window.soundEngine = new SoundFX(savedChoices);
