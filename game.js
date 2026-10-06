@@ -158,10 +158,8 @@ class Game {
 
     this.modeBtn.addEventListener('click', () => this.toggleAutoPlay());
     this.speedBtn.addEventListener('click', () => this.cycleSpeed());
-    this.soundBtn.addEventListener('click', () => {
-      const enabled = this.sound.toggle();
-      this.soundBtn.textContent = enabled ? '🔊' : '🔇';
-    });
+    this.soundBtn.addEventListener('click', () => this.toggleSound());
+    this.showSoundState();
 
     document.getElementById('skill1Btn').addEventListener('click', () => this.triggerWhirlwind());
     document.getElementById('skill2Btn').addEventListener('click', () => this.triggerShield());
@@ -190,6 +188,8 @@ class Game {
       if (e.code === 'Tab') {
         e.preventDefault();
         this.toggleAutoPlay();
+      } else if (e.code === 'KeyM') {
+        this.toggleSound();
       } else if (e.code === 'Digit1') {
         this.triggerWhirlwind();
       } else if (e.code === 'Digit2') {
@@ -225,6 +225,18 @@ class Game {
     this.speedIndex = (this.speedIndex + 1) % this.gameSpeedOptions.length;
     this.speedMultiplier = this.gameSpeedOptions[this.speedIndex];
     this.speedBtn.textContent = `${this.speedMultiplier}x`;
+  }
+
+  toggleSound() {
+    this.sound.toggle();
+    this.showSoundState();
+  }
+
+  // The button shows the current state, so a muted game reloads looking muted.
+  showSoundState() {
+    const on = this.sound.enabled;
+    this.soundBtn.textContent = on ? '🔊' : '🔇';
+    this.soundBtn.setAttribute('aria-pressed', String(on));
   }
 
   // Save/load progress (floor, gold, hero level, stats, gear) in localStorage.
