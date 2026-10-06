@@ -211,11 +211,14 @@ class Game {
 
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
+      // On a Mac, a key let go while ⌘ is down sends no keyup of its own, so
+      // letting go of ⌘ lets go of everything. A key still held repeats and
+      // comes straight back.
+      if (e.code === 'MetaLeft' || e.code === 'MetaRight') this.keys = {};
     });
 
-    // A key released while the window is in the background (⌘Tab away mid-move),
-    // or while ⌘ is held on a Mac, never sends a keyup, and the hero would keep
-    // walking. Leaving the window lets go of everything.
+    // A key let go while the window is in the background (⌘Tab away mid-move)
+    // sends no keyup either. Leaving the window lets go of everything.
     window.addEventListener('blur', () => {
       this.keys = {};
     });

@@ -91,8 +91,19 @@ test('leaving the window lets go of held keys', () => {
   press('KeyW');
   press('ArrowLeft');
   blur();
-  assert.equal(game.keys.KeyW, undefined);
-  assert.equal(game.keys.ArrowLeft, undefined);
+  assert.ok(!game.keys.KeyW);
+  assert.ok(!game.keys.ArrowLeft);
   press('KeyD');                                   // and keys work again after coming back
   assert.equal(game.keys.KeyD, true);
+});
+
+test('letting go of ⌘ lets go of a key whose own keyup a Mac swallowed', () => {
+  const { game, press, release } = gameWithKeys();
+  press('KeyW');
+  press('MetaLeft', { metaKey: true });
+  // W is let go here, but with ⌘ down the Mac sends no keyup for it.
+  release('MetaLeft');
+  assert.ok(!game.keys.KeyW);
+  press('KeyW', { repeat: true });                 // still physically held: back at once
+  assert.equal(game.keys.KeyW, true);
 });
