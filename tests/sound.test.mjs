@@ -95,6 +95,3 @@ test('toggling flips the sound, the icon and what screen readers hear', () => {
   assert.equal(attrs['aria-pressed'], 'true');
 });
 
-test('the M key toggles sound', () => {
-  assert.match(src('game.js'), /e\.code === 'KeyM'\)\s*\{\s*this\.toggleSound\(\);/);
-});

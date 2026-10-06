@@ -183,10 +183,18 @@ class Game {
 
   initControls() {
     window.addEventListener('keydown', (e) => {
+      // ⌘, Ctrl and Alt shortcuts belong to the browser: ⌘1 switches tab, ⌘M
+      // minimises. They shouldn't also use a skill or flip the sound.
+      // Shift is left alone on purpose: it's no browser shortcut on its own.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       this.keys[e.code] = true;
+      // Before the repeat check, so a held Tab can't walk focus around the page.
+      if (e.code === 'Tab' || e.code === 'Space') e.preventDefault();
+      // A held key repeats. Moving and attacking should keep going, but one press
+      // of 3 is one potion, and a held Tab or M shouldn't flicker on and off.
+      if (e.repeat && e.code !== 'Space') return;
 
       if (e.code === 'Tab') {
-        e.preventDefault();
         this.toggleAutoPlay();
       } else if (e.code === 'KeyM') {
         this.toggleSound();
@@ -197,7 +205,6 @@ class Game {
       } else if (e.code === 'Digit3') {
         this.usePotion();
       } else if (e.code === 'Space') {
-        e.preventDefault();
         if (!this.autoPlay) this.manualAttack();
       }
     });
