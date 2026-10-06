@@ -28,7 +28,7 @@ A retro dungeon crawler that plays itself. A pixel hero works down through proce
 - **Loot** in four rarities: common, rare, epic and legendary. Better swords and armor are equipped automatically, and every new relic (ring, fang, boots or stone) is put on.
 - **Levels:** every level-up raises HP, MP, attack and defence and gives a potion (you can carry up to 5).
 - **Saves itself** in your browser every few seconds: floor, best floor, gold, level, gear and shop upgrades.
-- **8-bit sound** synthesised with the Web Audio API, so there are no audio files.
+- **8-bit sound** synthesised with the Web Audio API, so there are no audio files. Mute it with 🔊 or M, and it stays muted next time.
 - **Speed control** at 1×, 2× or 4×.
 
 ---
@@ -58,6 +58,7 @@ Add `?portrait` to the URL to turn the map on its side, which suits a tall, narr
 | **1** | Whirlwind: hits every bug next to you |
 | **2** | Iron Wall: 2.5× defence for 4 seconds |
 | **3** | Health potion: restores half your HP |
+| **M** | Sound on/off (remembered next time) |
 
 ---
 
