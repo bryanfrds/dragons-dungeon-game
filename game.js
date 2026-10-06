@@ -212,6 +212,13 @@ class Game {
     window.addEventListener('keyup', (e) => {
       this.keys[e.code] = false;
     });
+
+    // A key released while the window is in the background (⌘Tab away mid-move),
+    // or while ⌘ is held on a Mac, never sends a keyup, and the hero would keep
+    // walking. Leaving the window lets go of everything.
+    window.addEventListener('blur', () => {
+      this.keys = {};
+    });
   }
 
   toggleAutoPlay() {
