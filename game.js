@@ -753,11 +753,7 @@ class Game {
         this.aiActionText.textContent = 'AI: Looting Treasure Chest...';
         const dst = Math.hypot(unopenedChest.x - this.hero.gx, unopenedChest.y - this.hero.gy);
         if (dst <= 1.4) {
-          unopenedChest.opened = true;
-          this.rollLootDrop(false);
-          this.gainXp(30);
-          this.gold += 20;
-          this.log('Opened treasure chest! +20 Gold, +30 XP.', 'loot');
+          this.openChest(unopenedChest);
         } else {
           const path = this.dungeonGen.findPath({ x: this.hero.gx, y: this.hero.gy }, { x: unopenedChest.x, y: unopenedChest.y });
           if (path.length > 0) this.moveHeroTo(path[0].x, path[0].y);
@@ -776,6 +772,14 @@ class Game {
         }
       }
     }
+  }
+
+  openChest(chest) {
+    chest.opened = true;
+    this.rollLootDrop(false);
+    this.gainXp(30);
+    this.gold += 20;
+    this.log('Opened treasure chest! +20 Gold, +30 XP.', 'loot');
   }
 
   /**
@@ -932,6 +936,9 @@ class Game {
       else if (this.keys['KeyS'] || this.keys['ArrowDown']) this.moveHeroTo(this.hero.gx, this.hero.gy + 1);
       else if (this.keys['KeyA'] || this.keys['ArrowLeft']) this.moveHeroTo(this.hero.gx - 1, this.hero.gy);
       else if (this.keys['KeyD'] || this.keys['ArrowRight']) this.moveHeroTo(this.hero.gx + 1, this.hero.gy);
+      // Only the AI used to open chests, so a player who took over never could.
+      const chest = this.dungeon.chests.find(c => !c.opened && c.x === this.hero.gx && c.y === this.hero.gy);
+      if (chest) this.openChest(chest);
     } else {
       this.updateAI(dt);
     }
