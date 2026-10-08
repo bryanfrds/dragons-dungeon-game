@@ -482,3 +482,15 @@ test('reloading on the game-over screen respawns, rather than carrying on', () =
   assert.equal(again.hero.hp, again.maxHp);
   assert.equal(again.hero.mp, again.hero.maxMp);
 });
+
+test('a potion near full HP says how much it really healed', () => {
+  // The heal is capped at max HP, but the text always claimed the full half.
+  const game = makeGame();
+  const said = [];
+  game.log = (msg) => { said.push(msg); };
+  game.hero.hp = game.maxHp - 7;
+  game.usePotion();
+  assert.equal(game.hero.hp, game.maxHp);
+  assert.equal(game.floatingTexts.at(-1).text, '+7 HP');
+  assert.equal(said.at(-1), 'Used Health Potion! Restored 7 HP.');
+});
