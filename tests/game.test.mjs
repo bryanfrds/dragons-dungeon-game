@@ -462,3 +462,23 @@ test('in manual play, walking onto a chest opens it', () => {
   assert.equal(game.gold, 20);
   assert.equal(game.drops, 1);
 });
+
+test('reloading on the game-over screen respawns, rather than carrying on', () => {
+  // The save kept the floor you died on, so a reload skipped RESPAWN: same
+  // floor, full HP, potions kept.
+  const game = makeGame();
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(6);
+  game.hero.potions = 5;
+  game.hero.hp = 0;                 // died here
+  game.saveGame();
+  const again = makeGame();
+  again.dungeonGen = new DungeonGenerator(25, 16);
+  const saved = again.loadGame();
+  again.startFloor(saved.floor);
+  assert.equal(again.floor, 1);
+  assert.equal(again.bestFloor, 6);
+  assert.equal(again.hero.potions, 2);
+  assert.equal(again.hero.hp, again.maxHp);
+  assert.equal(again.hero.mp, again.hero.maxMp);
+});
