@@ -544,8 +544,9 @@ class Game {
     if (this.hero.hp <= 0) return;
     if (this.hero.potions <= 0 || this.hero.hp >= this.maxHp) return;
     this.hero.potions--;
-    const healAmt = Math.floor(this.maxHp * 0.5);
-    this.hero.hp = Math.min(this.maxHp, this.hero.hp + healAmt);
+    const before = this.hero.hp;
+    this.hero.hp = Math.min(this.maxHp, this.hero.hp + Math.floor(this.maxHp * 0.5));
+    const healAmt = this.hero.hp - before;          // capped at max HP, so say what it really did
     this.sound.playPotion();
     this.addFloatingText(`+${healAmt} HP`, this.hero.x + 16, this.hero.y, '#34d399');
     this.log(`Used Health Potion! Restored ${healAmt} HP.`, 'heal');
