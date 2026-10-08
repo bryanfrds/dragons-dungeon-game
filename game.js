@@ -583,8 +583,11 @@ class Game {
     // Lifesteal heal
     if (this.totalLifesteal > 0) {
       const heal = Math.max(1, Math.floor(dmg * (this.totalLifesteal / 100)));
+      const before = this.hero.hp;
       this.hero.hp = Math.min(this.maxHp, this.hero.hp + heal);
-      this.addFloatingText(`+${heal}`, this.hero.x + 16, this.hero.y, '#34d399');
+      // Show what was really restored: near or at max HP that's less, or nothing.
+      const restored = this.hero.hp - before;
+      if (restored > 0) this.addFloatingText(`+${restored}`, this.hero.x + 16, this.hero.y, '#34d399');
     }
 
     // Spark particles
