@@ -291,7 +291,14 @@ class Game {
         const item = cleanGear(gear[slot], slot);
         if (item) this.hero.equipment[slot] = item;
       }
-      if (this.hero.hp <= 0) this.hero.hp = this.maxHp;
+      if (this.hero.hp <= 0) {
+        // Saved on the game-over screen. Reloading used to carry on from the
+        // floor of death at full HP, skipping RESPAWN; do what RESPAWN does.
+        saved.floor = 1;
+        this.hero.hp = this.maxHp;
+        this.hero.mp = this.hero.maxMp;
+        this.hero.potions = 2;
+      }
       this.hero.hp = Math.min(this.hero.hp, this.maxHp);
       this.hero.mp = Math.min(this.hero.mp, this.hero.maxMp);
       // The badge is static HTML that only level-ups updated, so a loaded
