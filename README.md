@@ -53,7 +53,7 @@ Add `?portrait` to the URL to turn the map on its side, which suits a tall, narr
 | Key | Action |
 | --- | --- |
 | **Tab** | Switch between the AI and manual play |
-| **WASD / Arrows** | Move |
+| **WASD / Arrows** | Move (walk onto a chest to open it) |
 | **Space** | Attack (manual play) |
 | **1** | Whirlwind: hits every bug next to you |
 | **2** | Iron Wall: 2.5× defence for 4 seconds |
