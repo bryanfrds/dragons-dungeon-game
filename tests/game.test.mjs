@@ -443,6 +443,26 @@ test('a normal save loads back exactly as it was saved', () => {
   assert.deepEqual({ ...third.hero.equipment.relic }, { ...game.hero.equipment.relic });
 });
 
+test('in manual play, walking onto a chest opens it', () => {
+  // Only the AI used to open chests, so a player who pressed Tab never could.
+  const game = makeGame();
+  game.autoPlay = false;
+  game.rollLootDrop = () => { game.drops = (game.drops || 0) + 1; };
+  game.dungeon.grid[1][3] = TILE.CHEST;
+  const chest = { x: 3, y: 1, opened: false };
+  game.dungeon.chests.push(chest);
+  game.keys.KeyD = true;
+  run(game, 1);
+  assert.equal(chest.opened, true);
+  assert.equal(game.gold, 20);
+  assert.equal(game.drops, 1);
+  assert.equal(game.hero.xp, 30);
+  game.keys.KeyD = false;
+  run(game, 1);                    // standing on an opened chest gives nothing more
+  assert.equal(game.gold, 20);
+  assert.equal(game.drops, 1);
+});
+
 test('reloading on the game-over screen respawns, rather than carrying on', () => {
   // The save kept the floor you died on, so a reload skipped RESPAWN: same
   // floor, full HP, potions kept.
