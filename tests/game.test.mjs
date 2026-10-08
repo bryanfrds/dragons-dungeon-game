@@ -175,6 +175,20 @@ test("max HP includes the ring's bonus", () => {
   assert.equal(game.maxHp, 100);
 });
 
+test('lifesteal shows the HP it really restored, and nothing at full HP', () => {
+  // It used to show the raw heal, so a hit at full HP still floated "+N".
+  const game = makeGame();
+  game.hero.equipment.relic = { lifesteal: 50 };   // max HP 100, half of each hit back
+  const bug = addBug(game, 'slime', 3, 1);
+  const heals = () => game.floatingTexts.map(t => t.text).filter(t => t.startsWith('+'));
+  game.hero.hp = 97;
+  game.damageMonster(bug, 40);
+  assert.equal(game.hero.hp, 100);
+  assert.deepEqual(heals(), ['+3']);
+  game.damageMonster(bug, 40);                     // already full
+  assert.deepEqual(heals(), ['+3']);
+});
+
 test("two bugs chasing down one corridor never share a tile", () => {
   const game = makeGame(12, 3);                 // a 10-tile corridor
   game.autoPlay = false;
