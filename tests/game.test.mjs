@@ -442,3 +442,23 @@ test('a normal save loads back exactly as it was saved', () => {
   assert.ok(third.loadGame());
   assert.deepEqual({ ...third.hero.equipment.relic }, { ...game.hero.equipment.relic });
 });
+
+test('reloading on the game-over screen respawns, rather than carrying on', () => {
+  // The save kept the floor you died on, so a reload skipped RESPAWN: same
+  // floor, full HP, potions kept.
+  const game = makeGame();
+  game.dungeonGen = new DungeonGenerator(25, 16);
+  game.startFloor(6);
+  game.hero.potions = 5;
+  game.hero.hp = 0;                 // died here
+  game.saveGame();
+  const again = makeGame();
+  again.dungeonGen = new DungeonGenerator(25, 16);
+  const saved = again.loadGame();
+  again.startFloor(saved.floor);
+  assert.equal(again.floor, 1);
+  assert.equal(again.bestFloor, 6);
+  assert.equal(again.hero.potions, 2);
+  assert.equal(again.hero.hp, again.maxHp);
+  assert.equal(again.hero.mp, again.hero.maxMp);
+});
